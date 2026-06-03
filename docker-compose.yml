@@ -1,0 +1,62 @@
+version: '3.8'
+
+# ==============================================================================
+# AskHR Enterprise AI Orchestration Engine - Docker Compose Configuration
+# ==============================================================================
+# NOTE: DO NOT RUN THIS COMPOSE FILE DURING LOCAL LAPTOP DEVELOPMENT.
+# This file is strictly for future deployment readiness and CI/CD pipelines.
+# Local development runs the services natively in Python.
+services:
+  # 1. LLM Inference Service (Hosting the Qwen model)
+  llm_inference:
+    build:
+      context: .
+      dockerfile: services/llm_inference_service/Dockerfile
+    container_name: askhr_llm_inference
+    ports:
+      - "${LLM_SERVICE_PORT:-8000}:8000"
+    volumes:
+      # Mount the models folder to avoid baking large GGUF files into the image
+      - ./services/llm_inference_service/models:/app/services/llm_inference_service/models
+    environment:
+      - ENV=production
+      - MODEL_PATH=/app/services/llm_inference_service/models/qwen2.5-7b-instruct-q4_k_m.gguf
+    restart: always
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # Fallback to CPU resources if GPU is not available
+
+  # 2. Vector DB & RAG Service (File-based storage)
+  vector_db_service:
+    build:
+      context: .
+      dockerfile: services/vector_db_service/Dockerfile
+    container_name: askhr_vector_db_service
+    volumes:
+      - ./services/vector_db_service/local_qdrant_db:/app/services/vector_db_service/local_qdrant_db
+      - ./services/vector_db_service/raw_documents:/app/services/vector_db_service/raw_documents
+    environment:
+      - ENV=production
+    restart: always
+
+  # 3. Orchestrator Service (FastAPI core routing engine)
+  orchestrator:
+    build:
+      context: .
+      dockerfile: services/orchestrator_service/Dockerfile
+    container_name: askhr_orchestrator
+    ports:
+      - "${ORCHESTRATOR_SERVICE_PORT:-8080}:8080"
+    volumes:
+      - .:/app
+    environment:
+      - ENV=production
+      - LLM_API_URL=http://llm_inference:8000/v1
+    depends_on:
+      - llm_inference
+    restart: always

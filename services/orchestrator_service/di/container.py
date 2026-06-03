@@ -1,0 +1,58 @@
+from services.orchestrator_service.infrastructure.llm_clients.openai_client import OpenAICompatibleLLMClient
+from services.orchestrator_service.infrastructure.rag.qdrant_retriever import QdrantRetrieverAdapter
+from services.orchestrator_service.infrastructure.hr_systems.sap_client import SAPSuccessFactorsAdapter
+from services.orchestrator_service.infrastructure.storage.in_memory import InMemorySessionStore
+from services.orchestrator_service.infrastructure.nlp.hybrid_nlp import HybridNLPPipeline
+from services.orchestrator_service.application.flow_orchestrator import FlowOrchestrator
+from core.logger import get_logger
+
+logger = get_logger("dependency_injection_container")
+
+class DIContainer:
+    """
+    Dependency Injection Container.
+    Initializes and wires adapters to ports, exposing configured services as singletons.
+    """
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(DIContainer, cls).__new__(cls, *args, **kwargs)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+            
+        logger.info("Initializing DI Container and wiring enterprise dependencies...")
+        
+        # 1. Instantiate Adapters
+        self.llm_client = OpenAICompatibleLLMClient()
+        self.retriever = QdrantRetrieverAdapter()
+        self.hr_client = SAPSuccessFactorsAdapter()
+        self.session_store = InMemorySessionStore()
+        
+        # 2. Instantiate NLP Pipeline (passing LLM Client for semantic fallback)
+        self.nlp_pipeline = HybridNLPPipeline(self.llm_client)
+        
+        # 3. Instantiate and wire FlowOrchestrator
+        self.flow_orchestrator = FlowOrchestrator(
+            llm_client=self.llm_client,
+            retriever=self.retriever,
+            hr_client=self.hr_client,
+            session_store=self.session_store,
+            nlp_pipeline=self.nlp_pipeline
+        )
+        
+        self._initialized = True
+        logger.info("DI Container wired successfully.")
+
+# Global instance provider
+_container = None
+
+def get_container() -> DIContainer:
+    global _container
+    if _container is None:
+        _container = DIContainer()
+    return _container

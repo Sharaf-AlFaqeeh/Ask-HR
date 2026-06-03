@@ -1,0 +1,99 @@
+# Python
+
+**pycache**/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments
+
+venv/
+.venv/
+env/
+ENV/
+
+# Pytest
+
+.pytest_cache/
+
+# Coverage
+
+.coverage
+htmlcov/
+
+# IDEs
+
+.vscode/
+.idea/
+
+# Environment Variables
+
+.env
+.env.*
+!.env.example
+
+# Logs
+
+*.log
+logs/
+
+# OS Files
+
+.DS_Store
+Thumbs.db
+
+# AI Models (Very Large)
+
+models/
+services/llm_inference_service/models/
+
+# Hugging Face cache
+
+.cache/
+huggingface/
+hf_cache/
+
+# Temporary Files
+
+tmp/
+temp/
+*.tmp
+
+# Local Databases
+
+*.db
+*.sqlite
+*.sqlite3
+
+*.db
+*.sqlite
+*.sqlite3
+
+# Build Artifacts
+
+dist/
+build/
+*.egg-info/
+
+# Docker
+
+docker-data/
+docker-volumes/
+
+# Generated Files
+
+temp_to_search.txt
+
+# Optional Presentations
+
+*.pptx
+
+services/vector_db_service/local_qdrant_db/*
+!services/vector_db_service/local_qdrant_db/.gitkeep
+
+# db
+services/vector_db_service/local_qdrant_db/
+services/llm_inference_service/models/
+*.db
+*.sqlite
+*.sqlite3

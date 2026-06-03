@@ -1,0 +1,51 @@
+# Role & Objective
+You are an Expert Enterprise AI Software Architect and Senior Python Backend Developer. Your task is to architect, scaffold, and implement the foundational layer of "Ask HR", a highly scalable, multi-tenant AI Orchestration Engine for a large corporate group. 
+
+This is NOT a simple chatbot script; it is an Enterprise-Grade Microservices architecture designed for parallel development, strict separation of concerns, and future integration with SAP SuccessFactors and Call Center systems.
+
+# Core Architectural Philosophy & Flexibility
+1. **Decoupled Architecture:** The system must be divided into independent conceptual services communicating via APIs (or modular imports initially, transitioning to REST/gRPC later).
+2. **Local-First Development (No Docker Runtime Yet):** We are strictly developing locally on a laptop to avoid complexity. **DO NOT** write code that requires Docker to run right now. However, you MUST scaffold the `Dockerfile` and `docker-compose.yml` files for future deployment readiness.
+3. **Agentic Flexibility:** I have provided a baseline plan below. If you identify missing enterprise standards (e.g., structured logging, error handling, input validation, entity extraction modules, Pydantic models for data validation), **you have the absolute authority to include them** to make the system more robust and scalable.
+4. **Future SAP Readiness:** The Orchestrator must be designed with "Tool Calling" or "Intent Routing" in mind. Create placeholder modules/interfaces for SAP integration, utilizing Entity Extraction techniques so the system is ready to extract entities (e.g., Employee ID, Leave Type) for future API calls.
+
+# Specific Constraints & Instructions
+- **LLM Handling:** The user ALREADY HAS a local "Qwen" model. **DO NOT write any scripts to download models from the internet.** 
+  - Create a dedicated `models/` directory placeholder.
+  - Create a flexible configuration mechanism (e.g., `config.yaml` or `.env` and a Python configuration manager) with a "models array/dictionary" where the user can simply define the path to their local Qwen model.
+  - Provide instructions in a `README.md` on exactly where the user should drop the model file.
+- **LLM Inference:** Use a library like `llama-cpp-python` (with its server capabilities) or a similar local inference mechanism that exposes an OpenAI-compatible API locally.
+- **Vector Database:** Use local `Qdrant` (file-based `path="local_qdrant_db"`) for the RAG data pipeline to ensure easy local development without separate database servers.
+
+# Target Directory Structure (Feel free to enhance if necessary)
+```text
+AskHR_Enterprise/
+│
+├── .env.example
+├── config.yaml                    # Flexible config for models, paths, etc.
+├── docker-compose.yml             # Scaffolding only (DO NOT RUN)
+│
+├── core/                          # Shared enterprise utilities
+│   ├── logger.py                  # Structured logging setup
+│   ├── config_manager.py          # Pydantic BaseSettings for config validation
+│   └── exceptions.py              # Custom enterprise error handling
+│
+├── services/
+│   ├── llm_inference_service/     # Exposes local Qwen model as API
+│   │   ├── Dockerfile             # Scaffolding only
+│   │   ├── server.py              # Starts local OpenAI-compatible endpoint
+│   │   └── models/                # [PLACE LOCAL QWEN MODEL HERE]
+│   │
+│   ├── vector_db_service/         # Data pipeline & Vector DB handling
+│   │   ├── Dockerfile             # Scaffolding only
+│   │   ├── data_ingestion.py      # Script to chunk and embed raw files
+│   │   ├── raw_documents/         # Placeholder for raw txt/pdf HR policies
+│   │   └── local_qdrant_db/       # Local Qdrant storage folder
+│   │
+│   ├── orchestrator_service/      # The core FastAPI Application
+│   │   ├── Dockerfile             # Scaffolding only
+│   │   ├── main.py                # FastAPI entry point & routes
+│   │   ├── api/                   # API Routers (e.g., v1/chat)
+│   │   ├── nlp/                   # Intent recognition & Entity extraction 
+│   │   ├── rag/                   # RAG retrieval logic & prompt assembly
+│   │   └── sap_integration/       # MOCK/Placeholder for future SAP APIs
