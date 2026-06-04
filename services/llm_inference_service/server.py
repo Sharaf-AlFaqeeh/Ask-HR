@@ -2,17 +2,20 @@ import os
 import sys
 import time
 import uuid
+import platform
+from datetime import datetime
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import threading
 
 # Adjust path to import core modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-from core.logger import get_logger
+from core.logger import get_llm_logger, print_banner
 from core.config_manager import get_settings
 
-logger = get_logger("llm_inference_service")
+logger = get_llm_logger()
 settings = get_settings()
 
 app = FastAPI(
@@ -29,11 +32,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global variables for llama model
-llama_model = None
+# ══════════════════════════════════════════════════════════════
+# Global State
+# ══════════════════════════════════════════════════════════════
+llama_model: Any = None
 mock_mode = False
+_model_name_loaded = "none"
+_model_load_time_sec = 0.0
+_engine_type = "none"
 
-# OpenAI compatible request/response schemas
+# Runtime metrics (thread-safe counters)
+_metrics_lock = threading.Lock()
+_metrics = {
+    "total_requests": 0,
+    "total_errors": 0,
+    "total_tokens_in": 0,
+    "total_tokens_out": 0,
+    "total_inference_time_sec": 0.0,
+    "requests_log": [],  # Last N request summaries
+}
+
+_MAX_REQUEST_LOG = 100  # Keep last 100 request summaries
+
+def _record_metric(tokens_in: int, tokens_out: int, inference_sec: float, error: bool = False):
+    with _metrics_lock:
+        _metrics["total_requests"] += 1
+        if error:
+            _metrics["total_errors"] += 1
+        _metrics["total_tokens_in"] += tokens_in
+        _metrics["total_tokens_out"] += tokens_out
+        _metrics["total_inference_time_sec"] += inference_sec
+        _metrics["requests_log"].append({
+            "timestamp": datetime.now().isoformat(),
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+            "inference_sec": round(inference_sec, 3),
+            "error": error,
+        })
+        # Trim log to last N
+        if len(_metrics["requests_log"]) > _MAX_REQUEST_LOG:
+            _metrics["requests_log"] = _metrics["requests_log"][-_MAX_REQUEST_LOG:]
+
+
+# ══════════════════════════════════════════════════════════════
+# Request/Response Schemas (OpenAI compatible)
+# ══════════════════════════════════════════════════════════════
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -63,15 +106,96 @@ class ChatCompletionResponse(BaseModel):
     choices: List[ChatChoice]
     usage: UsageInfo
 
+
+# ══════════════════════════════════════════════════════════════
+# HTTP Middleware — Log Every Request
+# ══════════════════════════════════════════════════════════════
+@app.middleware("http")
+async def log_requests_middleware(request: Request, call_next):
+    """Logs every HTTP request with timing, method, path, and status code."""
+    start = time.time()
+    method = request.method
+    path = request.url.path
+    
+    # Skip noisy health check logs (only log at DEBUG level)
+    is_health = path in ("/health", "/docs", "/openapi.json")
+    
+    if not is_health:
+        logger.info(f"📨 HTTP {method} {path}", extra_fields={
+            "client": request.client.host if request.client else "unknown",
+        })
+    
+    response = await call_next(request)
+    
+    duration_ms = round((time.time() - start) * 1000, 1)
+    
+    if not is_health:
+        logger.info(f"📤 HTTP {method} {path} → {response.status_code}", extra_fields={
+            "status_code": response.status_code,
+            "duration_ms": duration_ms,
+        })
+    else:
+        logger.debug(f"HTTP {method} {path} → {response.status_code} ({duration_ms}ms)")
+    
+    return response
+
+
+# ══════════════════════════════════════════════════════════════
+# Startup — Model Loading with Full Logging
+# ══════════════════════════════════════════════════════════════
+def _get_system_info() -> Dict[str, Any]:
+    """Collect system info for the startup banner."""
+    info = {
+        "Platform": platform.platform(),
+        "Python": platform.python_version(),
+        "CPU Cores": os.cpu_count(),
+    }
+    try:
+        import psutil  # type: ignore
+        mem = psutil.virtual_memory()
+        info["RAM Total"] = f"{mem.total / (1024**3):.1f} GB"
+        info["RAM Available"] = f"{mem.available / (1024**3):.1f} GB"
+    except ImportError:
+        info["RAM"] = "(install psutil for RAM info)"
+    
+    try:
+        import torch  # type: ignore
+        if torch.cuda.is_available():
+            info["GPU"] = torch.cuda.get_device_name(0)
+            info["VRAM"] = f"{torch.cuda.get_device_properties(0).total_memory / (1024**3):.1f} GB"
+        else:
+            info["GPU"] = "None (CPU mode)"
+    except ImportError:
+        info["GPU"] = "torch not loaded yet"
+    
+    return info
+
+
 @app.on_event("startup")
 def startup_event():
-    global llama_model, mock_mode
+    global llama_model, mock_mode, _model_name_loaded, _model_load_time_sec, _engine_type
+    
+    # ── Print startup banner ──
+    sys_info = _get_system_info()
+    print_banner(
+        service_name="AskHR Local LLM Inference Service",
+        version="1.0.0",
+        extras=sys_info
+    )
+    
+    logger.info("═" * 60)
+    logger.info("🚀 SERVICE STARTUP — Initializing LLM Inference Engine")
+    logger.info("═" * 60)
     
     models_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "models"))
+    logger.info(f"📂 Models directory: {models_dir}")
+    
+    # List available models
+    if os.path.isdir(models_dir):
+        available = [d for d in os.listdir(models_dir) if os.path.isdir(os.path.join(models_dir, d))]
+        logger.info(f"📋 Available models: {available if available else '(none found)'}")
     
     # ── Priority order: prefer non-quantized models that work on CPU with low RAM ──
-    # 1. Non-AWQ models first (like Qwen2.5-0.5B-Instruct) — proven to work on CPU
-    # 2. AWQ models last — require GPU/CUDA or 16GB+ RAM for float32 dequantization
     CPU_MODEL_PRIORITY = [
         "Qwen2.5-0.5B-Instruct",   # ~2 GB RAM, non-quantized, fast on CPU
         "Qwen2.5-1.5B-Instruct",   # ~6 GB RAM, non-quantized
@@ -81,26 +205,34 @@ def startup_event():
         "Qwen3-4B-AWQ",            # ~16 GB RAM when dequantized to float32
     ]
     
-    # ── Try non-quantized CPU-friendly models first (hudhud approach) ──
+    # ── Try non-quantized CPU-friendly models first ──
     for model_name in CPU_MODEL_PRIORITY:
         model_path = os.path.join(models_dir, model_name)
         if not os.path.isdir(model_path):
+            logger.debug(f"Model {model_name} not found at {model_path}, skipping...")
             continue
-        logger.info(f"Found CPU-friendly model: {model_name}. Initializing via Transformers (CPU)...")
+        
+        logger.info(f"🔄 Loading CPU-friendly model: {model_name}")
+        logger.info(f"   Path: {model_path}")
+        
         try:
-            import torch
-            from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
+            import torch  # type: ignore
+            from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig  # type: ignore
             
-            logger.info("Loading tokenizer...")
+            load_start = time.time()
+            
+            logger.info(f"   📥 Step 1/3: Loading tokenizer...")
             tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True, use_fast=False)
+            logger.info(f"   ✅ Tokenizer loaded ({time.time() - load_start:.1f}s)")
             
+            logger.info(f"   📥 Step 2/3: Loading config...")
             config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
-            # Strip quantization_config if present (safety — non-AWQ models typically don't have one)
             if hasattr(config, "quantization_config"):
-                logger.info("Stripping quantization config for CPU loading...")
+                logger.info("   ⚠️ Stripping quantization config for CPU loading...")
                 delattr(config, "quantization_config")
             
-            logger.info(f"Loading model weights as float32 on CPU...")
+            logger.info(f"   📥 Step 3/3: Loading model weights (float32, CPU)...")
+            logger.info(f"   ⏳ This may take a minute depending on model size...")
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
                 config=config,
@@ -109,25 +241,42 @@ def startup_event():
                 ignore_mismatched_sizes=True
             )
             
+            _model_load_time_sec = round(time.time() - load_start, 2)
+            
+            # Get model size info
+            param_count = sum(p.numel() for p in model.parameters()) / 1e6
+            
             llama_model = (model, tokenizer)
-            logger.info(f"Transformers Engine (CPU) Loaded Successfully: {model_name}")
+            _model_name_loaded = model_name
+            _engine_type = "transformers_cpu"
             mock_mode = False
+            
+            logger.info("═" * 60)
+            logger.info(f"✅ MODEL LOADED SUCCESSFULLY")
+            logger.info(f"   Model: {model_name}")
+            logger.info(f"   Engine: Transformers (CPU, float32)")
+            logger.info(f"   Parameters: {param_count:.1f}M")
+            logger.info(f"   Load Time: {_model_load_time_sec}s")
+            logger.info("═" * 60)
             return
+            
         except Exception as e:
-            logger.error(f"Failed to load {model_name} via Transformers: {e}", exc_info=True)
+            logger.error(f"❌ Failed to load {model_name}: {e}", exc_info=True)
     
-    # ── Try AWQ models as fallback (requires significant RAM) ──
+    # ── Try AWQ models as fallback ──
     for model_name in AWQ_MODEL_FALLBACK:
         model_path = os.path.join(models_dir, model_name)
         if not os.path.isdir(model_path):
             continue
         logger.warning(
-            f"Only AWQ model found: {model_name}. "
+            f"⚠️ Only AWQ model found: {model_name}. "
             "AWQ requires GPU/CUDA or 16GB+ RAM for CPU dequantization. Attempting anyway..."
         )
         try:
-            import torch
-            from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
+            import torch  # type: ignore
+            from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig  # type: ignore
+            
+            load_start = time.time()
             
             tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True, use_fast=False)
             config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
@@ -142,35 +291,38 @@ def startup_event():
                 ignore_mismatched_sizes=True
             )
             
+            _model_load_time_sec = round(time.time() - load_start, 2)
+            param_count = sum(p.numel() for p in model.parameters()) / 1e6
+            
             llama_model = (model, tokenizer)
-            logger.info(f"Transformers Engine (CPU) Loaded Successfully: {model_name}")
+            _model_name_loaded = model_name
+            _engine_type = "transformers_cpu_awq"
             mock_mode = False
+            
+            logger.info(f"✅ AWQ Model Loaded: {model_name} ({param_count:.1f}M params, {_model_load_time_sec}s)")
             return
         except Exception as e:
-            logger.error(f"Failed to load AWQ model {model_name}: {e}", exc_info=True)
+            logger.error(f"❌ Failed to load AWQ model {model_name}: {e}", exc_info=True)
 
+    # ── Try GGUF model via llama-cpp-python ──
     model_path = os.getenv("LLM_MODEL_PATH", settings.llm.model_path)
-    logger.info("Initializing Local LLM Service...", extra_fields={"model_path": model_path})
+    logger.info(f"🔄 Trying GGUF model: {model_path}")
     
-    # Check if model path exists
     if not os.path.exists(model_path):
-        logger.error(
-            "Model file NOT found. Service will boot in MOCK MODE for local testing.",
-            extra_fields={"model_path": model_path}
-        )
-        logger.info(
-            "INSTRUCTIONS: Please place your local Qwen GGUF model in the models/ directory "
-            f"or update config.yaml with the correct path. Expected path: {os.path.abspath(model_path)}"
-        )
+        logger.warning("═" * 60)
+        logger.warning(f"⚠️ MOCK MODE ACTIVATED — No model file found")
+        logger.warning(f"   Expected path: {os.path.abspath(model_path)}")
+        logger.warning(f"   Place your GGUF model in: services/llm_inference_service/models/")
+        logger.warning("═" * 60)
         mock_mode = True
+        _engine_type = "mock"
         return
         
     try:
-        # Lazy import llama-cpp to allow mock execution even if library isn't fully compiled yet
-        import llama_cpp
+        import llama_cpp  # type: ignore
         
-        logger.info("Loading GGUF model into memory...", extra_fields={"model_path": model_path})
-        start_time = time.time()
+        logger.info(f"📥 Loading GGUF model into memory...")
+        load_start = time.time()
         
         llama_model = llama_cpp.Llama(
             model_path=model_path,
@@ -180,155 +332,348 @@ def startup_event():
             verbose=False
         )
         
-        duration = time.time() - start_time
-        logger.info(
-            "GGUF model loaded successfully!", 
-            extra_fields={"model_path": model_path, "load_duration_seconds": round(duration, 2)}
-        )
+        _model_load_time_sec = round(time.time() - load_start, 2)
+        _model_name_loaded = os.path.basename(model_path)
+        _engine_type = "llama_cpp"
+        
+        logger.info("═" * 60)
+        logger.info(f"✅ GGUF MODEL LOADED")
+        logger.info(f"   Path: {model_path}")
+        logger.info(f"   Load Time: {_model_load_time_sec}s")
+        logger.info(f"   Context: {settings.llm.n_ctx}, Threads: {settings.llm.n_threads}")
+        logger.info("═" * 60)
     except Exception as e:
-        logger.error("Failed to load model via llama-cpp-python. Falling back to MOCK MODE.", exc_info=True)
+        logger.error(f"❌ Failed to load GGUF model: {e}", exc_info=True)
+        logger.warning("⚠️ Falling back to MOCK MODE")
         mock_mode = True
+        _engine_type = "mock"
 
+
+# ══════════════════════════════════════════════════════════════
+# Main Inference Endpoint
+# ══════════════════════════════════════════════════════════════
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
 async def chat_completions(request: ChatCompletionRequest):
     """
     OpenAI-compatible Chat Completions endpoint.
     """
-    logger.info("Received chat completion request", extra_fields={"model": request.model, "messages_count": len(request.messages)})
+    request_id = str(uuid.uuid4())[:12]
+    user_query = request.messages[-1].content if request.messages else ""
+    
+    # ── Log incoming request ──
+    logger.info("─" * 60)
+    logger.info(f"📩 REQUEST [{request_id}] — New chat completion", extra_fields={
+        "request_id": request_id,
+        "model": request.model,
+        "messages_count": len(request.messages),
+        "user_query": user_query[:500],
+        "query_length_chars": len(user_query),
+        "temperature": request.temperature,
+        "max_tokens": request.max_tokens,
+        "engine": _engine_type,
+    })
+    
+    # Log all messages for debugging (system + user)
+    for i, msg in enumerate(request.messages):
+        role_icon = {"system": "🔧", "user": "👤", "assistant": "🤖"}.get(msg.role, "❓")
+        content_preview = msg.content[:200] + "..." if len(msg.content) > 200 else msg.content
+        logger.debug(f"   {role_icon} Message[{i}] ({msg.role}): {content_preview}")
     
     if mock_mode:
-        # Fallback simulated response for local testing
-        user_query = request.messages[-1].content
-        mock_reply = simulate_qwen_response(request.messages)
-        
-        return ChatCompletionResponse(
-            model=request.model,
-            choices=[
-                ChatChoice(
-                    index=0,
-                    message=ChatMessage(role="assistant", content=mock_reply),
-                    finish_reason="stop"
-                )
-            ],
-            usage=UsageInfo(
-                prompt_tokens=len(user_query.split()),
-                completion_tokens=len(mock_reply.split()),
-                total_tokens=len(user_query.split()) + len(mock_reply.split())
-            )
-        )
-        
+        return _handle_mock_inference(request, request_id, user_query)
+    
     try:
-        # Check if loaded via Transformers
         if isinstance(llama_model, tuple):
-            model, tokenizer = llama_model
-            
-            # Use tokenizer's apply_chat_template (like hudhud engine.py)
-            # This handles model-specific formatting automatically
-            messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-            formatted_prompt = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
-            
-            import torch
-            inputs = tokenizer(formatted_prompt, return_tensors="pt").to("cpu")
-            
-            logger.info("Running transformers model CPU inference...")
-            start_time = time.time()
-            
-            temp = request.temperature if request.temperature is not None else settings.llm.temperature
-            max_t = request.max_tokens if request.max_tokens is not None else settings.llm.max_tokens
-            
-            generated_ids = model.generate(
-                **inputs,
-                max_new_tokens=max_t,
-                temperature=temp,
-                do_sample=True if temp > 0 else False,
-                repetition_penalty=1.1
-            )
-            
-            duration = time.time() - start_time
-            response_ids = generated_ids[0][len(inputs.input_ids[0]):]
-            response_text = tokenizer.decode(response_ids, skip_special_tokens=True).strip()
-            
-            logger.info(
-                "Transformers inference completed", 
-                extra_fields={"duration_seconds": round(duration, 2), "response_length": len(response_text)}
-            )
-            
-            return ChatCompletionResponse(
-                model=request.model,
-                choices=[
-                    ChatChoice(
-                        index=0,
-                        message=ChatMessage(role="assistant", content=response_text),
-                        finish_reason="stop"
-                    )
-                ],
-                usage=UsageInfo(
-                    prompt_tokens=len(inputs.input_ids[0]),
-                    completion_tokens=len(response_ids),
-                    total_tokens=len(inputs.input_ids[0]) + len(response_ids)
-                )
-            )
-
-        # Convert request messages to llama-cpp format
-        formatted_prompt = ""
-        for msg in request.messages:
-            formatted_prompt += f"<|im_start|>{msg.role}\n{msg.content}<|im_end|>\n"
-        formatted_prompt += "<|im_start|>assistant\n"
-        
-        # Run inference
-        temp = request.temperature if request.temperature is not None else settings.llm.temperature
-        max_t = request.max_tokens if request.max_tokens is not None else settings.llm.max_tokens
-        
-        logger.info("Running llama-cpp inference local execution...")
-        start_time = time.time()
-        
-        output = llama_model(
-            formatted_prompt,
-            max_tokens=max_t,
-            temperature=temp,
-            stop=["<|im_end|>", "<|im_start|>"],
-            echo=False
-        )
-        
-        duration = time.time() - start_time
-        response_text = output["choices"][0]["text"].strip()
-        
-        logger.info(
-            "Inference completed", 
-            extra_fields={"duration_seconds": round(duration, 2), "response_length": len(response_text)}
-        )
-        
-        return ChatCompletionResponse(
-            model=request.model,
-            choices=[
-                ChatChoice(
-                    index=0,
-                    message=ChatMessage(role="assistant", content=response_text),
-                    finish_reason="stop"
-                )
-            ],
-            usage=UsageInfo(
-                prompt_tokens=output["usage"]["prompt_tokens"],
-                completion_tokens=output["usage"]["completion_tokens"],
-                total_tokens=output["usage"]["total_tokens"]
-            )
-        )
-        
+            return _handle_transformers_inference(request, request_id, user_query)
+        else:
+            return _handle_llamacpp_inference(request, request_id, user_query)
     except Exception as e:
-        logger.error("Error during llama-cpp inference", exc_info=True)
+        logger.error(f"❌ INFERENCE ERROR [{request_id}]", exc_info=True, extra_fields={
+            "request_id": request_id,
+            "user_query": user_query[:200],
+            "error": str(e),
+        })
+        _record_metric(0, 0, 0, error=True)
         raise HTTPException(status_code=500, detail=f"LLM Inference Error: {str(e)}")
 
+
+def _handle_mock_inference(request: ChatCompletionRequest, request_id: str, user_query: str) -> ChatCompletionResponse:
+    """Handle inference in mock mode with detailed logging."""
+    logger.info(f"⚙️ INFERENCE [{request_id}] — Starting MOCK inference")
+    start_time = time.time()
+    
+    mock_reply = simulate_qwen_response(request.messages)
+    
+    duration = round(time.time() - start_time, 4)
+    prompt_tokens = len(user_query.split())
+    completion_tokens = len(mock_reply.split())
+    
+    logger.info(f"✅ INFERENCE DONE [{request_id}] — Mock response generated", extra_fields={
+        "request_id": request_id,
+        "mock_mode": True,
+        "duration_sec": duration,
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": prompt_tokens + completion_tokens,
+        "response_preview": mock_reply[:300],
+    })
+    logger.info("─" * 60)
+    
+    _record_metric(prompt_tokens, completion_tokens, duration)
+    
+    return ChatCompletionResponse(
+        model=request.model,
+        choices=[
+            ChatChoice(
+                index=0,
+                message=ChatMessage(role="assistant", content=mock_reply),
+                finish_reason="stop"
+            )
+        ],
+        usage=UsageInfo(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens
+        )
+    )
+
+
+def _handle_transformers_inference(request: ChatCompletionRequest, request_id: str, user_query: str) -> ChatCompletionResponse:
+    """Handle inference via Transformers engine with detailed logging."""
+    model, tokenizer = llama_model
+    
+    temp = request.temperature if request.temperature is not None else settings.llm.temperature
+    max_t = request.max_tokens if request.max_tokens is not None else settings.llm.max_tokens
+    
+    logger.info(f"⚙️ INFERENCE [{request_id}] — Starting Transformers CPU inference", extra_fields={
+        "request_id": request_id,
+        "engine": "transformers_cpu",
+        "model": _model_name_loaded,
+        "temperature": temp,
+        "max_tokens": max_t,
+    })
+    
+    # Format messages using tokenizer's chat template
+    messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+    formatted_prompt = tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+    
+    logger.debug(f"   📝 Formatted prompt length: {len(formatted_prompt)} chars")
+    
+    import torch  # type: ignore
+    inputs = tokenizer(formatted_prompt, return_tensors="pt").to("cpu")
+    input_token_count = len(inputs.input_ids[0])
+    
+    logger.info(f"   🔢 Input tokenized: {input_token_count} tokens")
+    logger.info(f"   ⏳ Running model.generate()...")
+    
+    start_time = time.time()
+    
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_t,
+        temperature=temp,
+        do_sample=True if temp > 0 else False,
+        repetition_penalty=1.1
+    )
+    
+    duration = round(time.time() - start_time, 3)
+    response_ids = generated_ids[0][len(inputs.input_ids[0]):]
+    response_text = tokenizer.decode(response_ids, skip_special_tokens=True).strip()
+    
+    output_token_count = len(response_ids)
+    total_tokens = input_token_count + output_token_count
+    tokens_per_sec = round(output_token_count / duration, 1) if duration > 0 else 0
+    
+    # ── Log completion with full metrics ──
+    logger.info(f"✅ INFERENCE DONE [{request_id}]", extra_fields={
+        "request_id": request_id,
+        "engine": "transformers_cpu",
+        "duration_sec": duration,
+        "prompt_tokens": input_token_count,
+        "completion_tokens": output_token_count,
+        "total_tokens": total_tokens,
+        "tokens_per_sec": tokens_per_sec,
+        "response_length_chars": len(response_text),
+    })
+    logger.info(f"📊 METRICS [{request_id}] — {tokens_per_sec} tok/s | {duration}s | {total_tokens} tokens")
+    logger.info(f"   👤 Question: {user_query[:150]}")
+    logger.info(f"   🤖 Answer: {response_text[:300]}")
+    logger.info("─" * 60)
+    
+    _record_metric(input_token_count, output_token_count, duration)
+    
+    return ChatCompletionResponse(
+        model=request.model,
+        choices=[
+            ChatChoice(
+                index=0,
+                message=ChatMessage(role="assistant", content=response_text),
+                finish_reason="stop"
+            )
+        ],
+        usage=UsageInfo(
+            prompt_tokens=input_token_count,
+            completion_tokens=output_token_count,
+            total_tokens=total_tokens
+        )
+    )
+
+
+def _handle_llamacpp_inference(request: ChatCompletionRequest, request_id: str, user_query: str) -> ChatCompletionResponse:
+    """Handle inference via llama-cpp-python engine with detailed logging."""
+    temp = request.temperature if request.temperature is not None else settings.llm.temperature
+    max_t = request.max_tokens if request.max_tokens is not None else settings.llm.max_tokens
+    
+    logger.info(f"⚙️ INFERENCE [{request_id}] — Starting llama-cpp inference", extra_fields={
+        "request_id": request_id,
+        "engine": "llama_cpp",
+        "model": _model_name_loaded,
+        "temperature": temp,
+        "max_tokens": max_t,
+    })
+    
+    # Convert request messages to llama-cpp format
+    formatted_prompt = ""
+    for msg in request.messages:
+        formatted_prompt += f"<|im_start|>{msg.role}\n{msg.content}<|im_end|>\n"
+    formatted_prompt += "<|im_start|>assistant\n"
+    
+    logger.debug(f"   📝 Formatted prompt length: {len(formatted_prompt)} chars")
+    logger.info(f"   ⏳ Running llama_model()...")
+    
+    assert llama_model is not None, "Llama model is not loaded"
+    start_time = time.time()
+    output = llama_model(
+        formatted_prompt,
+        max_tokens=max_t,
+        temperature=temp,
+        stop=["<|im_end|>", "<|im_start|>"],
+        echo=False
+    )
+    
+    duration = round(time.time() - start_time, 3)
+    response_text = output["choices"][0]["text"].strip()
+    
+    prompt_tokens = output["usage"]["prompt_tokens"]
+    completion_tokens = output["usage"]["completion_tokens"]
+    total_tokens = output["usage"]["total_tokens"]
+    tokens_per_sec = round(completion_tokens / duration, 1) if duration > 0 else 0
+    
+    # ── Log completion with full metrics ──
+    logger.info(f"✅ INFERENCE DONE [{request_id}]", extra_fields={
+        "request_id": request_id,
+        "engine": "llama_cpp",
+        "duration_sec": duration,
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+        "tokens_per_sec": tokens_per_sec,
+        "response_length_chars": len(response_text),
+    })
+    logger.info(f"📊 METRICS [{request_id}] — {tokens_per_sec} tok/s | {duration}s | {total_tokens} tokens")
+    logger.info(f"   👤 Question: {user_query[:150]}")
+    logger.info(f"   🤖 Answer: {response_text[:300]}")
+    logger.info("─" * 60)
+    
+    _record_metric(prompt_tokens, completion_tokens, duration)
+    
+    return ChatCompletionResponse(
+        model=request.model,
+        choices=[
+            ChatChoice(
+                index=0,
+                message=ChatMessage(role="assistant", content=response_text),
+                finish_reason="stop"
+            )
+        ],
+        usage=UsageInfo(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens
+        )
+    )
+
+
+# ══════════════════════════════════════════════════════════════
+# Health & Monitoring Endpoints
+# ══════════════════════════════════════════════════════════════
 @app.get("/health")
 def health_check():
     return {
         "status": "healthy",
         "mock_mode": mock_mode,
         "model_loaded": llama_model is not None,
-        "engine": "llama-cpp-python"
+        "model_name": _model_name_loaded,
+        "engine": _engine_type,
+        "model_load_time_sec": _model_load_time_sec,
     }
 
+
+@app.get("/logs/tail")
+def logs_tail(lines: int = 50):
+    """Returns the last N lines from the dedicated LLM inference log file."""
+    log_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../logs/llm_inference.log"))
+    if not os.path.exists(log_path):
+        return {"error": "Log file not found", "path": log_path}
+    
+    try:
+        with open(log_path, "r", encoding="utf-8") as f:
+            all_lines = f.readlines()
+        
+        tail = all_lines[-lines:] if len(all_lines) > lines else all_lines
+        return {
+            "total_lines": len(all_lines),
+            "showing_last": len(tail),
+            "log_path": log_path,
+            "lines": [line.strip() for line in tail],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/logs/stats")
+def logs_stats():
+    """Returns runtime statistics about the inference service."""
+    with _metrics_lock:
+        total_req = _metrics["total_requests"]
+        total_err = _metrics["total_errors"]
+        total_time = _metrics["total_inference_time_sec"]
+        total_in = _metrics["total_tokens_in"]
+        total_out = _metrics["total_tokens_out"]
+        recent = _metrics["requests_log"][-10:]  # Last 10 requests
+    
+    avg_time = round(total_time / total_req, 3) if total_req > 0 else 0
+    avg_tokens_per_sec = round(total_out / total_time, 1) if total_time > 0 else 0
+    error_rate = round((total_err / total_req) * 100, 1) if total_req > 0 else 0
+    
+    return {
+        "service": {
+            "model": _model_name_loaded,
+            "engine": _engine_type,
+            "mock_mode": mock_mode,
+            "model_load_time_sec": _model_load_time_sec,
+        },
+        "totals": {
+            "requests": total_req,
+            "errors": total_err,
+            "error_rate_percent": error_rate,
+            "tokens_in": total_in,
+            "tokens_out": total_out,
+            "inference_time_sec": round(total_time, 3),
+        },
+        "averages": {
+            "avg_inference_sec": avg_time,
+            "avg_tokens_per_sec": avg_tokens_per_sec,
+        },
+        "recent_requests": recent,
+    }
+
+
+# ══════════════════════════════════════════════════════════════
+# Mock Response Simulator
+# ══════════════════════════════════════════════════════════════
 def simulate_qwen_response(messages: List[ChatMessage]) -> str:
     """
     Generates intelligent simulated response matching the style of Qwen 2.5
@@ -338,7 +683,7 @@ def simulate_qwen_response(messages: List[ChatMessage]) -> str:
     system_msg = next((m.content for m in messages if m.role == "system"), "")
     user_msg = messages[-1].content if messages else ""
     
-    logger.info(f"MOCK LLM: system_msg_len={len(system_msg)}, user_msg_len={len(user_msg)}")
+    logger.debug(f"MOCK LLM: system_msg_len={len(system_msg)}, user_msg_len={len(user_msg)}")
     
     # 0. Check if this is an NLP parser request (expects a valid JSON response)
     if "expert NLP parser" in system_msg or "valid JSON object matching this schema" in system_msg:
@@ -573,9 +918,16 @@ def simulate_qwen_response(messages: List[ChatMessage]) -> str:
 
 if __name__ == "__main__":
     import uvicorn
+    
+    host = os.getenv("LLM_SERVICE_HOST", settings.llm.service_host)
+    port = int(os.getenv("LLM_SERVICE_PORT", settings.llm.service_port))
+    
+    logger.info(f"🌐 Starting uvicorn server on {host}:{port}")
+    
     uvicorn.run(
         "server:app",
-        host=os.getenv("LLM_SERVICE_HOST", settings.llm.service_host),
-        port=int(os.getenv("LLM_SERVICE_PORT", settings.llm.service_port)),
-        reload=True
+        host=host,
+        port=port,
+        reload=True,
+        log_level="info"
     )

@@ -1,0 +1,114 @@
+## 🚀 أوامر التشغيل والإيقاف — AskHR System
+
+### ترتيب التشغيل المطلوب:
+**LLM أولاً** ← **ثم Orchestrator** (لأن الـ Orchestrator يتصل بالـ LLM)
+
+---
+
+### 1️⃣ خدمة LLM Inference (بورت 8000)
+
+```powershell
+# ── تشغيل ──
+cd P:\____AI____\HSAGroup\AskHRPro
+$env:PYTHONIOENCODING="utf-8"; $env:PYTHONUTF8="1"
+python services/llm_inference_service/server.py
+```
+
+```powershell
+# ── إيقاف ──
+# Ctrl+C في التيرمنل
+# أو من تيرمنل ثاني:
+netstat -ano | findstr :8000
+taskkill /PID <رقم_العملية> /F
+```
+
+---
+
+### 2️⃣ خدمة Orchestrator + الواجهة (بورت 8081)
+
+⚠️ ملاحظة مهمة: يجب التشغيل من المجلد الرئيسي للمشروع وليس من مجلد orchestrator_service
+   تشغيل python main.py من داخل مجلد orchestrator_service يسبب خطأ WinError 10013
+   بسبب مشاكل uvicorn reload مع مسارات Windows.
+
+```powershell
+# ── تشغيل (في تيرمنل ثاني) ──
+cd P:\____AI____\HSAGroup\AskHRPro
+$env:PYTHONIOENCODING="utf-8"; $env:PYTHONUTF8="1"
+python -m uvicorn services.orchestrator_service.main:app --host 127.0.0.1 --port 8081 --reload
+```
+
+```powershell
+# ── إيقاف ──
+# Ctrl+C في التيرمنل
+# أو:
+netstat -ano | findstr :8081
+taskkill /PID <رقم_العملية> /F
+```
+
+---
+
+### 3️⃣ تهيئة قاعدة بيانات RAG (مرة واحدة فقط)
+
+```powershell
+# ── تشغيل إدخال الوثائق ──
+cd P:\____AI____\HSAGroup\AskHRPro
+python services/vector_db_service/data_ingestion.py
+```
+
+---
+
+### ⚡ تشغيل النظام كامل (أمر واحد — تيرمنلين)
+
+```powershell
+# ── تيرمنل 1: LLM ──
+cd P:\____AI____\HSAGroup\AskHRPro
+$env:PYTHONUTF8="1"; $env:PYTHONIOENCODING="utf-8"
+python services/llm_inference_service/server.py
+
+# ── تيرمنل 2: Orchestrator (انتظر حتى يظهر "MODEL LOADED" في تيرمنل 1) ──
+cd P:\____AI____\HSAGroup\AskHRPro
+$env:PYTHONUTF8="1"; $env:PYTHONIOENCODING="utf-8"
+python -m uvicorn services.orchestrator_service.main:app --host 127.0.0.1 --port 8081 --reload
+```
+
+---
+
+### 🛑 إيقاف النظام كامل (أمر واحد)
+
+```powershell
+# إيقاف كل عمليات Python المرتبطة بالمشروع
+Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+---
+
+### 🔍 أوامر المراقبة (أثناء التشغيل)
+
+```powershell
+# صحة LLM
+curl http://127.0.0.1:8000/health
+
+# إحصائيات الاستدلال
+curl http://127.0.0.1:8000/logs/stats
+
+# آخر 50 سطر لوق
+curl http://127.0.0.1:8000/logs/tail?lines=50
+
+# صحة Orchestrator
+curl http://127.0.0.1:8081/health
+
+# فتح الواجهة في المتصفح
+Start-Process "http://127.0.0.1:8081"
+
+# مشاهدة ملف اللوق مباشرة
+Get-Content P:\____AI____\HSAGroup\AskHRPro\logs\llm_inference.log -Tail 20 -Wait
+```
+
+---
+
+### 📋 ملخص البورتات
+
+| الخدمة | البورت | الرابط |
+|--------|--------|--------|
+| LLM Inference | 8000 | http://127.0.0.1:8000 |
+| Orchestrator + UI | 8081 | http://127.0.0.1:8081 |
