@@ -5,6 +5,9 @@ from services.orchestrator_service.domain.interfaces import (
     ILLMClient, IRetriever, IHRSystemClient, ISessionStore, INLPPipeline
 )
 from services.orchestrator_service.application.session_manager import SessionManager
+from services.orchestrator_service.application.prompt_registry import PromptRegistry
+from services.orchestrator_service.application.response_templates import ResponseTemplates
+from core.config_manager import get_settings
 from core.logger import get_logger
 
 logger = get_logger("flow_orchestrator")
@@ -28,6 +31,7 @@ class FlowOrchestrator:
         self.session_store = session_store
         self.nlp_pipeline = nlp_pipeline
         self.dialog_manager = SessionManager()
+        self.settings = get_settings()
 
     async def handle_message(
         self, 
@@ -39,21 +43,26 @@ class FlowOrchestrator:
         """
         Main entry point for processing a single user query within a session context.
         """
+        start_time = time.time()
         logger.info(
             f"Processing message in flow orchestrator", 
             extra_fields={"session_id": session_id, "tenant_id": tenant_id, "query": query}
         )
 
         # 1. Retrieve or create session state
+        session_start = time.time()
         session = self.session_store.get_session(session_id, tenant_id)
         session.add_message(role="user", content=query)
         
         # Override employee ID if explicitly provided in request body
         if override_employee_id:
             session.employee_id = override_employee_id.upper()
+        session_duration = time.time() - session_start
 
         # 2. Run Intent Routing and Entity Extraction
-        intent, confidence, entities = await self.nlp_pipeline.analyze_query(query)
+        nlp_start = time.time()
+        has_pending = session.pending_action is not None
+        intent, confidence, entities = await self.nlp_pipeline.analyze_query(query, has_pending_action=has_pending)
         
         # If there is a pending SAP action, we assume the user is continuing the SAP dialog flow
         if session.pending_action and intent != "SAP":
@@ -63,24 +72,36 @@ class FlowOrchestrator:
             )
             intent = "SAP"
             confidence = 1.0
+        nlp_duration = time.time() - nlp_start
 
         # 3. Pass to Dialog Manager (Slot Filling / Dialog state)
+        dialog_start = time.time()
         missing_prompt, action_params = self.dialog_manager.process_dialog_turn(
             session=session,
             intent=intent,
             entities=entities
         )
+        dialog_duration = time.time() - dialog_start
 
         response_text = ""
         context_used = False
         sap_executed = False
         execution_details = {}
 
+        action_start = time.time()
         # 4. If missing details, prompt the user
         if missing_prompt:
             response_text = missing_prompt
             session.add_message(role="assistant", content=response_text)
             self.session_store.save_session(session)
+            
+            action_duration = time.time() - action_start
+            total_duration = time.time() - start_time
+            logger.info(
+                f"Execution time profile (Slot filling): session_store={session_duration:.3f}s, "
+                f"nlp_pipeline={nlp_duration:.3f}s, dialog_manager={dialog_duration:.3f}s, "
+                f"action_and_synthesis={action_duration:.3f}s, total={total_duration:.3f}s"
+            )
             
             return self._build_response_payload(
                 query=query,
@@ -102,7 +123,7 @@ class FlowOrchestrator:
             elif "month" in action_params:
                 action_name = "get_salary_slip"
                 
-            emp_id = action_params.get("employee_id")
+            emp_id = str(action_params.get("employee_id") or "")
             
             logger.info(f"Executing SAP Action: {action_name} for employee: {emp_id}")
             
@@ -110,68 +131,96 @@ class FlowOrchestrator:
                 if action_name == "request_leave":
                     leave_res = self.hr_client.request_leave(
                         employee_id=emp_id,
-                        leave_type=action_params.get("leave_type"),
-                        start_date=action_params.get("start_date"),
-                        end_date=action_params.get("end_date")
+                        leave_type=str(action_params.get("leave_type") or ""),
+                        start_date=str(action_params.get("start_date") or ""),
+                        end_date=str(action_params.get("end_date") or "")
                     )
                     execution_details = leave_res.model_dump()
                     
-                    # LLM ground response building
-                    llm_instruction = (
-                        "أنت مساعد موارد بشرية ذكي لمجموعة هائل سعيد أنعم (HSA Group).\n"
-                        "قم بصياغة استجابة باللغة العربية الفصحى تؤكد فيها نجاح تقديم طلب الإجازة في نظام SAP SuccessFactors بالبيانات التالية:\n"
-                        f"- رقم الطلب: {leave_res.request_id}\n"
-                        f"- الرقم الوظيفي للموظف: {emp_id}\n"
-                        f"- نوع الإجازة: {leave_res.leave_type}\n"
-                        f"- الفترة: من {leave_res.start_date} إلى {leave_res.end_date}\n"
-                        f"- حالة الطلب: {leave_res.status}\n"
-                        f"- رسالة التأكيد من SAP: {leave_res.message}\n"
-                    )
-                    response_text = await self.llm_client.query_llm([
-                        {"role": "system", "content": "أنت خبير خدمة عملاء الموارد البشرية لمجموعة HSA Group."},
-                        {"role": "user", "content": llm_instruction}
-                    ])
+                    if self.settings.orchestrator.use_sap_templates:
+                        response_text = ResponseTemplates.get_leave_response(
+                            request_id=leave_res.request_id,
+                            employee_id=emp_id,
+                            leave_type=leave_res.leave_type,
+                            start_date=leave_res.start_date,
+                            end_date=leave_res.end_date,
+                            status=leave_res.status,
+                            message=leave_res.message
+                        )
+                    else:
+                        # LLM ground response building
+                        llm_instruction = PromptRegistry.SAP_REQUEST_LEAVE_USER.format(
+                            request_id=leave_res.request_id,
+                            employee_id=emp_id,
+                            leave_type=leave_res.leave_type,
+                            start_date=leave_res.start_date,
+                            end_date=leave_res.end_date,
+                            status=leave_res.status,
+                            message=leave_res.message
+                        )
+                        response_text = await self.llm_client.query_llm([
+                            {"role": "system", "content": PromptRegistry.SAP_SYSTEM},
+                            {"role": "user", "content": llm_instruction}
+                        ])
                     
                 elif action_name == "get_salary_slip":
                     salary_res = self.hr_client.get_salary_slip(
                         employee_id=emp_id,
-                        month=action_params.get("month")
+                        month=str(action_params.get("month") or "")
                     )
                     execution_details = salary_res.model_dump()
                     
-                    llm_instruction = (
-                        "أنت مساعد موارد بشرية ذكي لمجموعة هائل سعيد أنعم (HSA Group).\n"
-                        "قم بصياغة استجابة باللغة العربية الفصحى تؤكد فيها تفاصيل كشف الراتب (Payslip) المسترجع للموظف من نظام SAP SuccessFactors:\n"
-                        f"بيانات كشف الراتب للموظف {emp_id} عن شهر {salary_res.month}:\n"
-                        f"- الراتب الأساسي: {salary_res.basic_salary} USD\n"
-                        f"- بدل السكن: {salary_res.housing_allowance} USD\n"
-                        f"- بدل المواصلات: {salary_res.transport_allowance} USD\n"
-                        f"- الاستقطاعات: {salary_res.deductions} USD\n"
-                        f"- صافي الراتب: {salary_res.net_salary} USD\n"
-                    )
-                    response_text = await self.llm_client.query_llm([
-                        {"role": "system", "content": "أنت خبير خدمة عملاء الموارد البشرية لمجموعة HSA Group."},
-                        {"role": "user", "content": llm_instruction}
-                    ])
+                    if self.settings.orchestrator.use_sap_templates:
+                        response_text = ResponseTemplates.get_salary_slip_response(
+                            employee_id=emp_id,
+                            month=salary_res.month,
+                            basic_salary=salary_res.basic_salary,
+                            housing_allowance=salary_res.housing_allowance,
+                            transport_allowance=salary_res.transport_allowance,
+                            deductions=salary_res.deductions,
+                            net_salary=salary_res.net_salary
+                        )
+                    else:
+                        llm_instruction = PromptRegistry.SAP_GET_SALARY_SLIP_USER.format(
+                            employee_id=emp_id,
+                            month=salary_res.month,
+                            basic_salary=salary_res.basic_salary,
+                            housing_allowance=salary_res.housing_allowance,
+                            transport_allowance=salary_res.transport_allowance,
+                            deductions=salary_res.deductions,
+                            net_salary=salary_res.net_salary
+                        )
+                        response_text = await self.llm_client.query_llm([
+                            {"role": "system", "content": PromptRegistry.SAP_SYSTEM},
+                            {"role": "user", "content": llm_instruction}
+                        ])
                     
                 else: # get_profile
                     profile_res = self.hr_client.get_employee_profile(employee_id=emp_id)
                     execution_details = profile_res.model_dump()
                     
-                    llm_instruction = (
-                        "أنت مساعد موارد بشرية ذكي لمجموعة هائل سعيد أنعم (HSA Group).\n"
-                        "قم بصياغة تحية دافئة وتأكيد قراءة ملف الموظف المسترجع من SAP SuccessFactors باللغة العربية الفصحى:\n"
-                        f"- الاسم: {profile_res.first_name} {profile_res.last_name}\n"
-                        f"- الإدارة: {profile_res.department}\n"
-                        f"- المسمى الوظيفي: {profile_res.position}\n"
-                        f"- البريد الإلكتروني: {profile_res.email}\n"
-                        f"- حالة الحساب: {profile_res.status}\n"
-                        "اسأل الموظف بلطف كيف يمكنك مساعدته اليوم في كشوف المرتبات أو تقديم إجازة."
-                    )
-                    response_text = await self.llm_client.query_llm([
-                        {"role": "system", "content": "أنت خبير خدمة عملاء الموارد البشرية لمجموعة HSA Group."},
-                        {"role": "user", "content": llm_instruction}
-                    ])
+                    if self.settings.orchestrator.use_sap_templates:
+                        response_text = ResponseTemplates.get_profile_response(
+                            first_name=profile_res.first_name,
+                            last_name=profile_res.last_name,
+                            department=profile_res.department,
+                            position=profile_res.position,
+                            email=profile_res.email,
+                            status=profile_res.status
+                        )
+                    else:
+                        llm_instruction = PromptRegistry.SAP_GET_PROFILE_USER.format(
+                            first_name=profile_res.first_name,
+                            last_name=profile_res.last_name,
+                            department=profile_res.department,
+                            position=profile_res.position,
+                            email=profile_res.email,
+                            status=profile_res.status
+                        )
+                        response_text = await self.llm_client.query_llm([
+                            {"role": "system", "content": PromptRegistry.SAP_SYSTEM},
+                            {"role": "user", "content": llm_instruction}
+                        ])
             except Exception as ex:
                 logger.error(f"Error executing SAP action: {str(ex)}", exc_info=True)
                 response_text = f"عذراً، حدث خطأ أثناء تنفيذ الإجراء في نظام SAP SuccessFactors: {str(ex)}"
@@ -184,23 +233,12 @@ class FlowOrchestrator:
             
             if context:
                 context_used = True
-                system_instructions = (
-                    "أنت خبير محترف ومستشار الموارد البشرية لمجموعة هائل سعيد أنعم (HSA Group).\n"
-                    "مهمتك هي الإجابة بدقة وأمانة على استفسارات الموظف باستخدام السياق المسترجع المرفق فقط.\n"
-                    "اتبع القواعد التالية بدقة:\n"
-                    "1. إذا لم تجد الإجابة في السياق المرفق، قل بوضوح ولطف: 'عذراً، لم أجد إجابة دقيقة لهذا الاستفسار في لوائح سياسات الموارد البشرية الحالية، يرجى التواصل مع إدارة الموارد البشرية مباشرة.'\n"
-                    "2. لا تقم أبداً باختلاق أو تخمين أي سياسات أو تواريخ أو أرقام غير موجودة في السياق المرفق.\n"
-                    "3. أجب بلغة مهنية وودودة للغاية باللغة العربية الفصحى.\n\n"
-                    "السياق المسترجع من اللوائح والسياسات الرسمية لمجموعة HSA:\n"
-                    "=========================================\n"
-                    f"{context}\n"
-                    "=========================================\n"
-                )
+                system_instructions = PromptRegistry.RAG_SYSTEM_TEMPLATE.format(context=context)
                 
                 # Assemble conversation context including history for better multi-turn interaction
                 messages = [{"role": "system", "content": system_instructions}]
-                # Append last few messages of history for conversational context (limit to last 5 for tokens)
-                for hist_msg in session.history[-6:-1]:
+                # Append last few messages of history for conversational context (limit to last 3 messages)
+                for hist_msg in session.history[-4:-1]:
                     messages.append({"role": hist_msg.role, "content": hist_msg.content})
                 messages.append({"role": "user", "content": query})
                 
@@ -208,7 +246,7 @@ class FlowOrchestrator:
             else:
                 logger.warning("No context found in RAG collection. Falling back to default assistant prompt.")
                 messages = [
-                    {"role": "system", "content": "أنت مساعد الموارد البشرية لمجموعة هائل سعيد أنعم (HSA Group). أجب بلطف وبأسلوب مهني."},
+                    {"role": "system", "content": PromptRegistry.FALLBACK_SYSTEM},
                     {"role": "user", "content": query}
                 ]
                 response_text = await self.llm_client.query_llm(messages)
@@ -216,6 +254,14 @@ class FlowOrchestrator:
         # 7. Update and save session history
         session.add_message(role="assistant", content=response_text)
         self.session_store.save_session(session)
+        
+        action_duration = time.time() - action_start
+        total_duration = time.time() - start_time
+        logger.info(
+            f"Execution time profile (Success): session_store={session_duration:.3f}s, "
+            f"nlp_pipeline={nlp_duration:.3f}s, dialog_manager={dialog_duration:.3f}s, "
+            f"action_and_synthesis={action_duration:.3f}s, total={total_duration:.3f}s"
+        )
 
         return self._build_response_payload(
             query=query,

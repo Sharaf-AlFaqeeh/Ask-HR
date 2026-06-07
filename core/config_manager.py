@@ -30,6 +30,7 @@ class OrchestratorSettings(BaseModel):
     port: int = 8080
     llm_api_url: str = "http://127.0.0.1:8000/v1"
     intent_confidence_threshold: float = 0.7
+    use_sap_templates: bool = True
 
 class SAPSettings(BaseModel):
     api_base_url: str = "https://mock.successfactors.eu/odata/v2"
@@ -77,16 +78,25 @@ def load_settings(config_path: str = "config.yaml") -> EnterpriseSettings:
             print(f"Warning: Failed to load {config_path}: {e}")
             
     # Apply direct overrides from environment variables if present
-    if os.getenv("APP_ENV"):
-        yaml_data.setdefault("app", {})["env"] = os.getenv("APP_ENV")
-    if os.getenv("LLM_SERVICE_PORT"):
-        yaml_data.setdefault("llm", {})["service_port"] = int(os.getenv("LLM_SERVICE_PORT"))
-    if os.getenv("ORCHESTRATOR_SERVICE_PORT"):
-        yaml_data.setdefault("orchestrator", {})["port"] = int(os.getenv("ORCHESTRATOR_SERVICE_PORT"))
-    if os.getenv("LLM_MODEL_PATH"):
-        yaml_data.setdefault("llm", {})["model_path"] = os.getenv("LLM_MODEL_PATH")
-    if os.getenv("VECTOR_DB_PATH"):
-        yaml_data.setdefault("vector_db", {})["storage_path"] = os.getenv("VECTOR_DB_PATH")
+    app_env = os.getenv("APP_ENV")
+    if app_env:
+        yaml_data.setdefault("app", {})["env"] = app_env
+        
+    llm_port = os.getenv("LLM_SERVICE_PORT")
+    if llm_port:
+        yaml_data.setdefault("llm", {})["service_port"] = int(llm_port)
+        
+    orch_port = os.getenv("ORCHESTRATOR_SERVICE_PORT")
+    if orch_port:
+        yaml_data.setdefault("orchestrator", {})["port"] = int(orch_port)
+        
+    model_path = os.getenv("LLM_MODEL_PATH")
+    if model_path:
+        yaml_data.setdefault("llm", {})["model_path"] = model_path
+        
+    db_path = os.getenv("VECTOR_DB_PATH")
+    if db_path:
+        yaml_data.setdefault("vector_db", {})["storage_path"] = db_path
 
     # Load with pydantic-settings (Environment variables override YAML settings)
     _settings = EnterpriseSettings(

@@ -50,7 +50,7 @@ class ISessionStore(ABC):
 
 class INLPPipeline(ABC):
     @abstractmethod
-    async def analyze_query(self, query: str) -> Tuple[str, float, Dict[str, Any]]:
+    async def analyze_query(self, query: str, has_pending_action: bool = False) -> Tuple[str, float, Dict[str, Any]]:
         """
         Analyzes query to extract intent, confidence, and entities.
         Returns: Tuple[intent_name, confidence_score, extracted_entities_dict]

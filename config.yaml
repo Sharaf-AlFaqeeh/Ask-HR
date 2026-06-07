@@ -34,6 +34,8 @@ orchestrator:
   llm_api_url: "http://127.0.0.1:8000/v1"
   # Intent Router Confidence Threshold
   intent_confidence_threshold: 0.7
+  # Use predefined templates for SAP responses to save time/tokens (true/false)
+  use_sap_templates: true
 
 # Future SAP SuccessFactors Integration Settings (Mock placeholders)
 sap:

@@ -16,13 +16,13 @@ class RuleNLPAdapter:
     SAP_KEYWORDS = [
         "apply", "request", "submit", "book", "leave", "vacation", "sick leave", 
         "payslip", "salary slip", "salary", "pay slip", "slip",
-        "طلب", "تقديم", "إجازة", "اجازه", "مرضية", "مرضيه", "سنوية", "سنويه",
-        "راتب", "كشف راتب", "كشف الراتب", "سليب", "الراتب", "خصم", "بدل"
+        "طلب", "تقديم", "إجازة", "اجازه", "اجازة", "اجازتي", "رصيد", "مرضية", "مرضيه", "سنوية", "سنويه",
+        "راتب", "كشف راتب", "كشف الراتب", "سليب", "الراتب", "خصم"
     ]
     
     RAG_KEYWORDS = [
         "policy", "rule", "guideline", "what is", "how many", "limit", "allowance", "benefits",
-        "سياسة", "سياسه", "حقوق", "بدلات", "قانون", "كم يوم", "شروط", "تأمين", "تأمين طبي"
+        "سياسة", "سياسه", "حقوق", "بدل", "بدلات", "قانون", "كم يوم", "شروط", "تأمين", "تأمين طبي"
     ]
 
     def analyze_query(self, query: str) -> Tuple[str, float, Dict[str, Any]]:
@@ -90,14 +90,25 @@ class RuleNLPAdapter:
         elif any(w in q for w in ["بدون راتب", "unpaid"]):
             entities["leave_type"] = "UNPAID_LEAVE"
 
-        # Dates extraction (YYYY-MM-DD or DD/MM/YYYY)
-        date_pattern = r'\b(\d{4}[-/]\d{2}[-/]\d{2}|\d{2}[-/]\d{2}[-/]\d{4})\b'
+        # Dates extraction (YYYY-MM-DD or DD/MM/YYYY with support for 1-2 digit months and days)
+        date_pattern = r'\b(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4})\b'
         dates = re.findall(date_pattern, query)
+        
+        def _normalize_date(date_str: str) -> str:
+            normalized = date_str.replace('/', '-')
+            parts = normalized.split('-')
+            if len(parts) == 3:
+                if len(parts[0]) == 4: # YYYY-MM-DD or YYYY-M-D
+                    return f"{parts[0]}-{parts[1].zfill(2)}-{parts[2].zfill(2)}"
+                elif len(parts[2]) == 4: # DD-MM-YYYY or D-M-YYYY
+                    return f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+            return date_str
+
         if len(dates) >= 2:
-            entities["start_date"] = dates[0]
-            entities["end_date"] = dates[1]
+            entities["start_date"] = _normalize_date(dates[0])
+            entities["end_date"] = _normalize_date(dates[1])
         elif len(dates) == 1:
-            entities["start_date"] = dates[0]
+            entities["start_date"] = _normalize_date(dates[0])
 
         # Month extraction (Arabic and English)
         months_pattern = (

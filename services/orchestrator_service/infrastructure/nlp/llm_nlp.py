@@ -2,6 +2,7 @@ import json
 import re
 from typing import Dict, Any, Tuple, Optional
 from services.orchestrator_service.domain.interfaces import ILLMClient
+from services.orchestrator_service.application.prompt_registry import PromptRegistry
 from core.logger import get_logger
 
 logger = get_logger("llm_nlp_adapter")
@@ -14,28 +15,41 @@ class LLMNLPAdapter:
     def __init__(self, llm_client: ILLMClient):
         self.llm_client = llm_client
 
+    TEMPORAL_KEYWORDS = {
+        # English relative/temporal terms
+        "today", "tomorrow", "yesterday", "next", "last", "day", "week", "month", "year",
+        "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+        "mon", "tue", "wed", "thu", "fri", "sat", "sun", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+        # Arabic relative/temporal terms
+        "اليوم", "بكرة", "بكرا", "غدا", "غداً", "أمس", "الامس", "يوم", "يومين", "أيام", "ايام", "اسبوع", "أسبوع",
+        "اسابيع", "أسابيع", "شهر", "شهور", "أشهر", "اشهر", "سنة", "سنوات", "أعوام", "اعوام", "عام",
+        "يناير", "فبراير", "مارس", "أبريل", "ابريل", "مايو", "يونيو", "يوليو", "أغسطس", "اغسطس", "سبتمبر", "أكتوبر", "اكتوبر", "نوفمبر", "ديسمبر",
+        "السبت", "الأحد", "الاحد", "الاثنين", "الثلاثاء", "الأربعاء", "الاربعاء", "الخميس", "الجمعة", "الجمعه",
+        "القادم", "المقبل", "الماضي", "السابق", "منذ", "خلال", "بعد", "قبل"
+    }
+
+    def _validate_temporal_entity(self, query: str, value: Optional[str]) -> Optional[str]:
+        if not value:
+            return None
+        # Normalize comparison
+        q_lower = query.lower()
+        val_str = str(value).lower()
+        if val_str in q_lower:
+            return value
+        # Check if query contains any digits (Western or Arabic-Indic)
+        if re.search(r'[0-9\u0660-\u0669]', query):
+            return value
+        # Tokenize query and check intersection with temporal keywords
+        words = set(re.findall(r'\w+', q_lower))
+        if words.intersection(self.TEMPORAL_KEYWORDS):
+            return value
+        logger.warning(f"Validation failed for LLM-extracted entity: '{value}' in query '{query}'. Nullifying to prevent hallucination.")
+        return None
+
     async def analyze_query_async(self, query: str) -> Tuple[str, float, Dict[str, Any]]:
         logger.info(f"Running LLM semantic NLP analysis for query: '{query}'")
         
-        system_instruction = (
-            "You are an expert NLP parser for a Corporate HR system.\n"
-            "Analyze the user's HR query and output ONLY a valid JSON object matching this schema:\n"
-            "{\n"
-            "  \"intent\": \"SAP\" or \"RAG\",\n"
-            "  \"confidence\": float (0.0 to 1.0),\n"
-            "  \"entities\": {\n"
-            "    \"employee_id\": string or null,\n"
-            "    \"leave_type\": \"ANNUAL_LEAVE\" | \"SICK_LEAVE\" | \"MATERNITY_LEAVE\" | \"PATERNITY_LEAVE\" | \"UNPAID_LEAVE\" | null,\n"
-            "    \"start_date\": \"YYYY-MM-DD\" or null,\n"
-            "    \"end_date\": \"YYYY-MM-DD\" or null,\n"
-            "    \"month\": string (e.g. \"May 2026\", \"مايو\") or null\n"
-            "  }\n"
-            "}\n\n"
-            "Rules:\n"
-            "- Set intent to \"SAP\" if the user wants to execute an action (e.g. submit leave request, request payslip, get profile info).\n"
-            "- Set intent to \"RAG\" if the user is asking a general policy question (e.g. 'How many leave days?', 'What is housing allowance?').\n"
-            "- Do NOT include any markdown block ticks (like ```json), introduction, or explanations. Only return the raw JSON string."
-        )
+        system_instruction = PromptRegistry.NLP_PARSER_SYSTEM
 
         messages = [
             {"role": "system", "content": system_instruction},
@@ -43,8 +57,8 @@ class LLMNLPAdapter:
         ]
 
         try:
-            # Query LLM (using low temperature for deterministic parsing output)
-            response_text = await self.llm_client.query_llm(messages, temperature=0.0)
+            # Query LLM (using low temperature and lower max_tokens for deterministic parsing output)
+            response_text = await self.llm_client.query_llm(messages, temperature=0.0, max_tokens=256)
             logger.info(f"LLM NLP Raw Response: {response_text}")
             
             # Clean and parse output
@@ -54,13 +68,18 @@ class LLMNLPAdapter:
             confidence = float(parsed_data.get("confidence", 0.7))
             entities = parsed_data.get("entities", {})
             
+            # Extract and validate dates/month to prevent hallucinations
+            start_date = self._validate_temporal_entity(query, entities.get("start_date"))
+            end_date = self._validate_temporal_entity(query, entities.get("end_date"))
+            month = self._validate_temporal_entity(query, entities.get("month"))
+
             # Sanity-clean entities dictionary keys
             cleaned_entities = {
                 "employee_id": entities.get("employee_id"),
                 "leave_type": entities.get("leave_type"),
-                "start_date": entities.get("start_date"),
-                "end_date": entities.get("end_date"),
-                "month": entities.get("month")
+                "start_date": start_date,
+                "end_date": end_date,
+                "month": month
             }
             
             return intent, confidence, cleaned_entities

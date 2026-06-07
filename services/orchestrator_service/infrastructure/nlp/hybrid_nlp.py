@@ -20,12 +20,18 @@ class HybridNLPPipeline(INLPPipeline):
         self.confidence_threshold = settings.orchestrator.intent_confidence_threshold
         logger.info(f"Hybrid NLP Pipeline initialized (Threshold: {self.confidence_threshold})")
 
-    async def analyze_query(self, query: str) -> Tuple[str, float, Dict[str, Any]]:
+    async def analyze_query(self, query: str, has_pending_action: bool = False) -> Tuple[str, float, Dict[str, Any]]:
         """
         Executes hybrid classification: Rules first, falling back to LLM if needed.
         """
         # 1. Run rule-based analyzer synchronously
         rule_intent, rule_conf, rule_entities = self.rule_nlp.analyze_query(query)
+
+        # If there is an active pending action, skip LLM parsing to save resources and time.
+        # Slot filling relies heavily on rules/regex for specific parameters.
+        if has_pending_action:
+            logger.info("Active pending action found. Skipping LLM NLP parsing to save resources.")
+            return rule_intent, rule_conf, rule_entities
 
         # 2. If rules are highly confident and have resolved the employee ID, we can skip LLM parsing to save resources
         if rule_conf >= 0.9 and rule_entities.get("employee_id") is not None:
