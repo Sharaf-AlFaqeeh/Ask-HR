@@ -1,5 +1,9 @@
 // AskHR Enterprise AI Orchestration Suite - Frontend Engine (app.js)
 
+const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://127.0.0.1:8081' 
+    : window.location.origin.replace(':8082', ':8081');
+
 let currentSessionId = null;
 let isWaitingResponse = false;
 let totalQueries = 24892; // Seeded value from design image
@@ -16,6 +20,7 @@ let chartData = [];
 window.addEventListener('load', () => {
     checkServerHealth();
     initChart();
+    loadSavedTheme();
     addConsoleLog('تم تشغيل لوحة التحكم ومكتبة الرسوم البيانية بنجاح.', 'success');
     addConsoleLog('نظام أوركسترا AskHR نشط وجاهز لاستقبال الاتصالات.', 'info');
     
@@ -65,7 +70,6 @@ function switchView(viewName) {
 // Check api health status
 async function checkServerHealth() {
     try {
-        const baseUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:8081' : '';
         const response = await fetch(`${baseUrl}/health`);
         const dot = document.getElementById('server-status-dot');
         const text = document.getElementById('server-status-text');
@@ -114,12 +118,12 @@ function initChart() {
             datasets: [{
                 label: 'زمن المعالجة (ملي ثانية)',
                 data: chartData,
-                borderColor: '#5c5be5',
-                backgroundColor: 'rgba(92, 91, 229, 0.08)',
+                borderColor: '#d4af37',
+                backgroundColor: 'rgba(212, 175, 55, 0.08)',
                 fill: true,
                 tension: 0.4,
                 borderWidth: 2,
-                pointBackgroundColor: '#5c5be5',
+                pointBackgroundColor: '#d4af37',
                 pointBorderColor: '#fff',
                 pointRadius: 4,
                 pointHoverRadius: 6
@@ -284,7 +288,6 @@ async function sendQuery(query) {
             payload.session_id = currentSessionId;
         }
 
-        const baseUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:8081' : '';
         const response = await fetch(`${baseUrl}/api/v1/chat`, {
             method: 'POST',
             headers: {
@@ -483,7 +486,6 @@ async function triggerIngest() {
     btn.innerHTML = '<i class="fa-solid fa-sync fa-spin"></i> جاري تحديث الفهرس...';
 
     try {
-        const baseUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:8081' : '';
         const response = await fetch(`${baseUrl}/api/v1/admin/ingest`, {
             method: 'POST',
             headers: {
@@ -523,7 +525,6 @@ async function clearSessionById() {
     addConsoleLog(`جاري إرسال طلب حذف الجلسة: ${targetSessionId}...`, 'info');
 
     try {
-        const baseUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:8081' : '';
         const response = await fetch(`${baseUrl}/api/v1/admin/sessions/${targetSessionId}`, {
             method: 'DELETE',
             headers: {
@@ -583,3 +584,55 @@ function addActivityRow(user, activityText, status, latency) {
         tableBody.removeChild(tableBody.lastChild);
     }
 }
+
+// -------------------- THEME TOGGLE LOGIC --------------------
+function toggleTheme() {
+    const body = document.body;
+    const icon = document.getElementById('theme-toggle-icon');
+    
+    if (body.classList.contains('light-theme')) {
+        body.classList.remove('light-theme');
+        if (icon) {
+            icon.className = 'fa-solid fa-sun';
+        }
+        localStorage.setItem('theme', 'dark');
+        addConsoleLog('تم التحويل إلى المظهر الداكن.', 'info');
+        updateChartTheme(false);
+    } else {
+        body.classList.add('light-theme');
+        if (icon) {
+            icon.className = 'fa-solid fa-moon';
+        }
+        localStorage.setItem('theme', 'light');
+        addConsoleLog('تم التحويل إلى المظهر الفاتح.', 'info');
+        updateChartTheme(true);
+    }
+}
+
+function loadSavedTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    const body = document.body;
+    const icon = document.getElementById('theme-toggle-icon');
+    
+    if (savedTheme === 'light') {
+        body.classList.add('light-theme');
+        if (icon) {
+            icon.className = 'fa-solid fa-moon';
+        }
+        setTimeout(() => updateChartTheme(true), 200);
+    }
+}
+
+function updateChartTheme(isLight) {
+    if (!latencyChart) return;
+    
+    const textColor = isLight ? '#475569' : '#a3b1c6';
+    const gridColor = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)';
+    
+    latencyChart.options.scales.y.ticks.color = textColor;
+    latencyChart.options.scales.y.grid.color = gridColor;
+    latencyChart.options.scales.x.ticks.color = textColor;
+    
+    latencyChart.update();
+}
+

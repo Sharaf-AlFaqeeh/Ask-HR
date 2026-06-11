@@ -51,7 +51,7 @@ services:
       dockerfile: services/orchestrator_service/Dockerfile
     container_name: askhr_orchestrator
     ports:
-      - "${ORCHESTRATOR_SERVICE_PORT:-8080}:8080"
+      - "${ORCHESTRATOR_PORT:-8081}:8081"
     volumes:
       - .:/app
     environment:
@@ -59,4 +59,21 @@ services:
       - LLM_API_URL=http://llm_inference:8000/v1
     depends_on:
       - llm_inference
+    restart: always
+
+  # 4. Frontend Portal Service (Sleek static file server)
+  frontend:
+    build:
+      context: .
+      dockerfile: services/frontend_service/Dockerfile
+    container_name: askhr_frontend
+    ports:
+      - "${FRONTEND_PORT:-8082}:8082"
+    volumes:
+      - ./services/frontend_service:/app
+    environment:
+      - ENV=production
+      - PORT=8082
+    depends_on:
+      - orchestrator
     restart: always

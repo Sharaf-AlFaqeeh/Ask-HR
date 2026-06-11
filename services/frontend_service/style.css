@@ -4,22 +4,35 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700&display=swap');
 
 :root {
-    --bg-primary: #0a0b13;      /* Deep dark slate background */
-    --bg-secondary: #121424;    /* Card background */
-    --bg-sidebar: #06070c;      /* Sidebar background (almost black) */
-    --bg-input: #1b1e32;        /* Input backgrounds */
+    /* HSA Group Corporate Colors */
+    --hsa-navy-dark: #050b14;     /* Deep navy background */
+    --hsa-navy-card: #0d1625;     /* Corporate navy card background */
+    --hsa-navy-sidebar: #03070d;  /* Darkest navy sidebar */
+    --hsa-navy-input: #121e30;    /* Dark navy input fields */
     
-    --accent-purple: #5c5be5;    /* Nexus purple accent */
-    --accent-purple-glow: rgba(92, 91, 229, 0.35);
-    --accent-blue: #2563eb;
-    --accent-teal: #0d9488;
+    --hsa-blue: #0056b3;          /* HSA primary blue */
+    --hsa-blue-glow: rgba(0, 86, 179, 0.35);
+    --hsa-gold: #d4af37;          /* HSA metallic gold */
+    --hsa-gold-glow: rgba(212, 175, 55, 0.35);
+    --hsa-gold-dark: #b8860b;     /* Darker gold for gradients */
+    
+    /* Mapping to layout variables for perfect backward compatibility */
+    --bg-primary: var(--hsa-navy-dark);
+    --bg-secondary: var(--hsa-navy-card);
+    --bg-sidebar: var(--hsa-navy-sidebar);
+    --bg-input: var(--hsa-navy-input);
+    
+    --accent-purple: var(--hsa-gold);
+    --accent-purple-glow: var(--hsa-gold-glow);
+    --accent-blue: var(--hsa-blue);
+    --accent-teal: var(--hsa-gold); /* Align teal accents to gold for consistency */
     
     --text-primary: #ffffff;
-    --text-secondary: #8c8fa7;
-    --text-muted: #53566e;
+    --text-secondary: #a3b1c6;    /* Slate-blue text for modern contrast */
+    --text-muted: #627289;        /* Muted slate text */
     
-    --border-color: rgba(255, 255, 255, 0.055);
-    --border-hover: rgba(92, 91, 229, 0.25);
+    --border-color: rgba(212, 175, 55, 0.08); /* Subtle gold tint borders */
+    --border-hover: var(--hsa-gold-glow);
     
     --success: #10b981;
     --warning: #f59e0b;
@@ -1061,15 +1074,15 @@ body[dir="ltr"] .activity-table {
 }
 
 .message-wrapper.user .message-bubble {
-    background: linear-gradient(135deg, #5c5be5, #2563eb);
+    background: linear-gradient(135deg, var(--hsa-blue), #002855);
     color: #fff;
     border-top-right-radius: 4px;
-    box-shadow: 0 4px 15px rgba(92, 91, 229, 0.25);
+    box-shadow: 0 4px 15px var(--hsa-blue-glow);
 }
 
 .message-wrapper.bot .message-bubble {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(212, 175, 55, 0.18);
     color: var(--text-primary);
     border-top-left-radius: 4px;
 }
@@ -1204,7 +1217,7 @@ body[dir="ltr"] .activity-table {
 
 .empty-icon {
     font-size: 3.5rem;
-    background: linear-gradient(135deg, #5c5be5, #8b5cf6);
+    background: linear-gradient(135deg, var(--hsa-gold), var(--hsa-gold-dark));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     animation: float 4s ease-in-out infinite;
@@ -1231,8 +1244,331 @@ body[dir="ltr"] .activity-table {
 }
 
 .suggested-chip:hover {
-    background: rgba(92, 91, 229, 0.12);
-    border-color: rgba(92, 91, 229, 0.35);
+    background: rgba(212, 175, 55, 0.12);
+    border-color: rgba(212, 175, 55, 0.35);
     color: #fff;
     transform: translateY(-2px);
 }
+
+/* Ambient glow background effects */
+.ambient-glow-1 {
+    position: absolute;
+    top: -10%;
+    left: -10%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(0, 86, 179, 0.12) 0%, rgba(5, 11, 20, 0) 70%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.ambient-glow-2 {
+    position: absolute;
+    bottom: -10%;
+    right: -10%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(212, 175, 55, 0.06) 0%, rgba(5, 11, 20, 0) 70%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Logo Styling */
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.hsa-logo-svg {
+    flex-shrink: 0;
+}
+
+.logo-divider {
+    color: rgba(255, 255, 255, 0.15);
+    font-size: 1.3rem;
+    font-weight: 300;
+}
+
+.logo-app-title {
+    font-family: var(--font-main);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.logo-app-title .pro-tag {
+    font-family: var(--font-numeric);
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: var(--hsa-gold);
+    background: rgba(212, 175, 55, 0.12);
+    border: 1px solid rgba(212, 175, 55, 0.25);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+.logo-hsa-text {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    background: linear-gradient(135deg, #FFE082, #D4AF37);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* ================= LIGHT THEME OVERRIDES ================= */
+body.light-theme {
+    /* HSA Group Corporate Light Theme Colors */
+    --hsa-navy-dark: #f0f4f8;     /* Light slate/blue background */
+    --hsa-navy-card: #ffffff;     /* Pure white card background */
+    --hsa-navy-sidebar: #0a1128;  /* Keep sidebar dark navy for professional contrast */
+    --hsa-navy-input: #e2e8f0;    /* Light gray inputs */
+    
+    --bg-primary: var(--hsa-navy-dark);
+    --bg-secondary: var(--hsa-navy-card);
+    --bg-sidebar: var(--hsa-navy-sidebar);
+    --bg-input: var(--hsa-navy-input);
+    
+    --text-primary: #0f172a;      /* Dark slate text */
+    --text-secondary: #475569;    /* Medium slate text */
+    --text-muted: #94a3b8;        /* Muted text */
+    
+    --border-color: rgba(0, 86, 179, 0.08); /* Blue tinted border */
+    --border-hover: rgba(212, 175, 55, 0.4);  /* Gold hover glow border */
+}
+
+/* Specific component overrides for light theme */
+body.light-theme .message-wrapper.bot .message-bubble {
+    background: #f8fafc;
+    border: 1px solid rgba(0, 86, 179, 0.12);
+    color: #0f172a;
+}
+
+body.light-theme .chat-input {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+body.light-theme .search-input {
+    background: rgba(255, 255, 255, 0.8);
+    color: #0f172a;
+}
+
+body.light-theme .search-input:focus {
+    background: #ffffff;
+}
+
+body.light-theme .control-icon {
+    color: #64748b;
+}
+
+body.light-theme .control-icon:hover {
+    color: var(--hsa-gold);
+}
+
+body.light-theme .header-tab {
+    color: #64748b;
+}
+
+body.light-theme .header-tab:hover {
+    color: #0f172a;
+}
+
+body.light-theme .header-tab.active {
+    color: #0f172a;
+}
+
+body.light-theme .header-brand {
+    color: #ffffff;
+}
+
+body.light-theme .logo-app-title {
+    color: #ffffff;
+}
+
+body.light-theme .dashboard-card {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .split-card {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .activity-card {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .card-value {
+    color: #0f172a;
+}
+
+body.light-theme .split-card-title {
+    color: #0f172a;
+}
+
+body.light-theme .user-cell-name {
+    color: #0f172a;
+}
+
+body.light-theme .progress-row-val {
+    color: #0f172a;
+}
+
+body.light-theme .settings-title {
+    color: #0f172a;
+}
+
+body.light-theme .settings-desc {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+body.light-theme ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+body.light-theme .ambient-glow-1 {
+    background: radial-gradient(circle, rgba(0, 86, 179, 0.08) 0%, rgba(240, 244, 248, 0) 70%);
+}
+
+body.light-theme .ambient-glow-2 {
+    background: radial-gradient(circle, rgba(212, 175, 55, 0.04) 0%, rgba(240, 244, 248, 0) 70%);
+}
+
+body.light-theme .top-header {
+    background-color: #ffffff;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme .server-status {
+    background: rgba(0, 0, 0, 0.03);
+    color: #64748b;
+}
+
+body.light-theme #server-status-text {
+    color: #334155;
+}
+
+body.light-theme .uptime-value {
+    color: #0f172a;
+}
+
+body.light-theme .uptime-ring .bg {
+    stroke: rgba(0, 0, 0, 0.03);
+}
+
+body.light-theme .progress-bar-wrapper {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+body.light-theme .progress-row-bar-bg {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+body.light-theme .swapper-pills {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+body.light-theme .swapper-pill.active {
+    background-color: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme .btn-card {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+
+body.light-theme .btn-card:hover {
+    background-color: #f8fafc;
+}
+
+body.light-theme .activity-table th {
+    color: #64748b;
+}
+
+body.light-theme .activity-table td {
+    color: #334155;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+body.light-theme .user-cell-avatar {
+    background-color: rgba(0, 86, 179, 0.05);
+    color: var(--hsa-blue);
+    border-color: rgba(0, 86, 179, 0.1);
+}
+
+body.light-theme .assistant-sidebar .glass-card {
+    background: #ffffff;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .state-row {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+body.light-theme .state-row:last-child {
+    border-bottom: none;
+}
+
+body.light-theme .state-label {
+    color: #64748b;
+}
+
+body.light-theme .state-value {
+    color: #0f172a;
+}
+
+body.light-theme .state-value.empty {
+    color: #94a3b8;
+}
+
+body.light-theme .assistant-sidebar h4 {
+    color: var(--hsa-blue) !important;
+}
+
+body.light-theme .badge-none {
+    background: rgba(0, 0, 0, 0.03);
+    color: #64748b;
+}
+
+body.light-theme .console-output {
+    background: #f8fafc;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme .console-line {
+    color: #334155;
+}
+
+body.light-theme .console-time {
+    color: #64748b;
+}
+
+body.light-theme .suggested-chip {
+    background: #ffffff;
+    border-color: rgba(0, 86, 179, 0.1);
+    color: #334155;
+}
+
+body.light-theme .suggested-chip:hover {
+    background: rgba(212, 175, 55, 0.08);
+    border-color: var(--hsa-gold);
+    color: #b8860b;
+}
+
+

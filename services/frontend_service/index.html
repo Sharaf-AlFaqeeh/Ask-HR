@@ -23,8 +23,23 @@
         <!-- --- LEFT SIDEBAR --- -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h1 class="sidebar-title">AskHR Enterprise</h1>
-                <div class="sidebar-subtitle">GLOBAL AI WORKSPACE</div>
+                <div class="logo-wrapper">
+                    <svg class="hsa-logo-svg" viewBox="0 0 120 40" width="120" height="40">
+                        <defs>
+                            <linearGradient id="gold-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#FFE082" />
+                                <stop offset="50%" stop-color="#D4AF37" />
+                                <stop offset="100%" stop-color="#B38F24" />
+                            </linearGradient>
+                        </defs>
+                        <text x="5" y="28" font-family="'Outfit', sans-serif" font-weight="900" font-size="26" fill="url(#gold-grad)" letter-spacing="-1">HSA</text>
+                        <path d="M 5 32 Q 55 38 105 32" fill="none" stroke="#0056b3" stroke-width="3.5" stroke-linecap="round" />
+                        <path d="M 45 32 Q 75 35 105 32" fill="none" stroke="url(#gold-grad)" stroke-width="2.5" stroke-linecap="round" />
+                    </svg>
+                    <span class="logo-divider">|</span>
+                    <span class="logo-app-title">AskHR <span class="pro-tag">PRO</span></span>
+                </div>
+                <div class="sidebar-subtitle">HSA GROUP CORPORATE AI SUITE</div>
             </div>
 
             <ul class="nav-menu">
@@ -70,7 +85,11 @@
             <!-- Top Header Bar -->
             <header class="top-header">
                 <div class="logo-area">
-                    <span class="header-brand">AskHR Suite</span>
+                    <div class="logo-wrapper">
+                        <span class="logo-hsa-text">HSA Group</span>
+                        <span class="logo-divider">|</span>
+                        <span class="header-brand">AskHR Pro</span>
+                    </div>
                 </div>
 
                 <div class="search-container">
@@ -87,6 +106,9 @@
                 <button class="header-action-btn" onclick="triggerIngest()">+ تحديث الفهرس</button>
 
                 <div class="header-controls">
+                    <div class="control-icon" id="theme-toggle" onclick="toggleTheme()" title="تبديل المظهر (Light/Dark Mode)">
+                        <i class="fa-solid fa-sun" id="theme-toggle-icon"></i>
+                    </div>
                     <div class="control-icon">
                         <i class="fa-solid fa-bell"></i>
                         <div class="control-badge"></div>

@@ -13,7 +13,7 @@ COPY core/ /app/core/
 COPY config.yaml /app/
 COPY services/orchestrator_service/ /app/services/orchestrator_service/
 
-EXPOSE 8080
+EXPOSE 8081
 
 ENV PYTHONUNBUFFERED=1
 

@@ -43,3 +43,8 @@ sap:
   company_id: "HSAGroup"
   client_id: "ask_hr_orchestrator"
   mock_mode: true          # Set to true for local development testing without real SAP connection
+
+# Frontend Service Settings
+frontend:
+  host: "127.0.0.1"
+  port: 8082

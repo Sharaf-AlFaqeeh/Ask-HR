@@ -63,27 +63,9 @@ from services.orchestrator_service.api.v1.admin import router as admin_router
 app.include_router(chat_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 def read_root():
-    index_path = os.path.join(os.path.dirname(__file__), "index.html")
-    if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
-            return f.read()
-    return "<h1>AskHR Orchestrator Service is Running</h1>"
-
-@app.get("/style.css")
-def read_style():
-    style_path = os.path.join(os.path.dirname(__file__), "style.css")
-    if os.path.exists(style_path):
-        return FileResponse(style_path, media_type="text/css")
-    return "/* CSS file not found */", 404
-
-@app.get("/app.js")
-def read_js():
-    js_path = os.path.join(os.path.dirname(__file__), "app.js")
-    if os.path.exists(js_path):
-        return FileResponse(js_path, media_type="application/javascript")
-    return "/* JS file not found */", 404
+    return {"status": "running", "service": "AskHR AI Orchestrator"}
 
 # Enterprise Global Exception Handler
 @app.exception_handler(AskHRException)
