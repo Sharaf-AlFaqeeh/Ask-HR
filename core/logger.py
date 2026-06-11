@@ -7,6 +7,18 @@ import time
 from contextvars import ContextVar
 from typing import Any, Dict, Optional, cast
 
+# Reconfigure standard output streams to UTF-8 to prevent UnicodeEncodeErrors on Windows
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # Context variable to hold request correlation ID for tracing
 correlation_id: ContextVar[str] = ContextVar("correlation_id", default="system")
 

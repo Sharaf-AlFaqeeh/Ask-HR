@@ -3,90 +3,83 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any
 
-# Adjust path to import core modules
+# Adjust paths to import core modules and preprocessing modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+
 from core.logger import get_logger
 from core.config_manager import get_settings
 from core.exceptions import VectorDBError
+from services.vector_db_service.preprocessing.cleaner import extract_text_from_pdf, clean_arabic_text
+from services.vector_db_service.preprocessing.chunker import chunk_document_pages
 
 logger = get_logger("vector_db_service")
 settings = get_settings()
 
-def create_mock_documents_if_empty(docs_dir: Path) -> None:
-    """
-    Creates high-quality mock HR policies for HSA Group if raw_documents directory is empty.
-    """
-    docs_dir.mkdir(parents=True, exist_ok=True)
-    
-    mock_files = {
-        "hsa_leave_policy.txt": (
-            "سياسة الإجازات الرسمية والسنوية لمجموعة هائل سعيد أنعم (HSA Group):\n\n"
-            "1. الإجازة السنوية المدفوعة الأجر:\n"
-            "- يستحق كل موظف إجازة سنوية مدتها 30 يوماً تقويمياً مدفوعة الأجر بالكامل بعد إتمام عام كامل من الخدمة المتواصلة.\n"
-            "- يجب التنسيق وتقديم طلب الإجازة قبل 14 يوماً على الأقل من تاريخ بدء الإجازة لضمان استمرارية العمل.\n"
-            "- يسمح بترحيل ما لا يزيد عن 10 أيام من الإجازة غير المستخدمة إلى العام التالي بعد موافقة مدير الموارد البشرية.\n\n"
-            "2. الإجازة المرضية:\n"
-            "- يستحق الموظف إجازة مرضية مدفوعة الأجر بالكامل لمدة تصل إلى 15 يوماً في السنة، بناءً على تقرير طبي معتمد.\n"
-            "- إذا تجاوزت الإجازة المرضية 15 يوماً، يتم تخفيض الراتب وفق قانون العمل المعمول به (75% من الراتب للأيام الـ 15 التالية).\n\n"
-            "3. إجازة الأبوة والأمومة:\n"
-            "- تستحق الموظفة إجازة وضع مدفوعة الأجر بالكامل لمدة 70 يوماً.\n"
-            "- يستحق الموظف الأب إجازة أبوة مدفوعة الأجر لمدة 3 أيام عند ولادة طفل له."
-        ),
-        "hsa_benefits_policy.txt": (
-            "سياسة البدلات والتعويضات والمزايا الوظيفية بمجموعة HSA Group:\n\n"
-            "1. بدل السكن:\n"
-            "- تمنح المجموعة جميع الموظفين من الدرجة الرابعة فما فوق بدل سكن شهري يعادل 25% من الراتب الأساسي، أو توفر سكناً عينياً ملائماً.\n"
-            "- يصرف بدل السكن بالتزامن مع الراتب الشهري ويخضع للتقييم السنوي.\n\n"
-            "2. التأمين الطبي:\n"
-            "- توفر HSA Group تغطية تأمين طبي شاملة (فئة أ/Class A) للموظف وعائلته المباشرة (الزوج/الزوجة والأبناء حتى سن 18 عاماً).\n"
-            "- تشمل التغطية الرعاية الطبية في المستشفيات والعيادات الخارجية المعتمدة، مع نسبة مساهمة للموظف لا تتعدى 10% للعيادات الخارجية.\n\n"
-            "3. بدل المواصلات:\n"
-            "- يصرف بدل مواصلات شهري لجميع الموظفين بحسب فئاتهم الوظيفية لتغطية تكاليف التنقل للعمل:\n"
-            "  * الفئة التشغيلية: 150 دولار شهرياً.\n"
-            "  * الفئة الإدارية: 300 دولار شهرياً أو سيارة مخصصة من الشركة."
-        )
-    }
-    
-    for filename, content in mock_files.items():
-        file_path = docs_dir / filename
-        if not file_path.exists():
-            logger.info(f"Creating mock HR policy: {filename}")
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(content)
-
-def chunk_text(text: str, chunk_size: int = 500, chunk_overlap: int = 50) -> List[str]:
-    """
-    Splits text into semantic chunks of roughly chunk_size characters with overlap.
-    """
-    paragraphs = text.split("\n\n")
-    chunks = []
-    current_chunk = ""
-    
-    for paragraph in paragraphs:
-        if len(current_chunk) + len(paragraph) < chunk_size:
-            current_chunk += paragraph + "\n\n"
-        else:
-            if current_chunk:
-                chunks.append(current_chunk.strip())
-            current_chunk = paragraph + "\n\n"
-            
-    if current_chunk:
-        chunks.append(current_chunk.strip())
-        
-    return chunks
-
 def ingest_documents() -> None:
     """
-    Reads local HR policy files, embeds them, and ingests into Qdrant.
+    Reads local HR policy PDFs and text files, cleans/chunks them, and ingests into Qdrant.
     """
     # 1. Setup paths
-    raw_docs_path = Path(settings.vector_db.storage_path).parent / "raw_documents"
+    db_service_dir = Path(__file__).parent
+    hsa_policies_path = db_service_dir / "HSA_policies"
+    # raw_docs_path = db_service_dir / "raw_documents"
     qdrant_db_path = Path(settings.vector_db.storage_path)
     
     logger.info("Initializing Data Ingestion Pipeline...")
-    create_mock_documents_if_empty(raw_docs_path)
     
-    # 2. Initialize Qdrant Client in local file-based mode
+    # 2. Collect files and process chunks
+    all_chunks = []
+    all_metadata = []
+    
+    # Process PDF files inside HSA_policies directories (Real System Data)
+    if hsa_policies_path.exists():
+        logger.info(f"Scanning for PDF policies in {hsa_policies_path.absolute()}")
+        for pdf_path in hsa_policies_path.rglob("*.pdf"):
+            try:
+                category = pdf_path.parent.name
+                logger.info(f"Processing PDF document: {pdf_path.name} in category: {category}")
+                
+                # Extract page data
+                pages_data = extract_text_from_pdf(pdf_path)
+                if not pages_data:
+                    logger.warning(f"No text extracted from PDF: {pdf_path.name}")
+                    continue
+                
+                # Clean text for each page
+                cleaned_pages = []
+                for p in pages_data:
+                    cleaned_text = clean_arabic_text(p["text"])
+                    if cleaned_text:
+                        cleaned_pages.append({
+                            "page_number": p["page_number"],
+                            "text": cleaned_text
+                        })
+                
+                # Segment pages into chunks
+                chunks = chunk_document_pages(cleaned_pages, chunk_size=600, overlap=100)
+                logger.info(f"Segmented {pdf_path.name} into {len(chunks)} chunks.")
+                
+                for i, chunk in enumerate(chunks):
+                    all_chunks.append(chunk["text"])
+                    all_metadata.append({
+                        "source": pdf_path.name,
+                        "page_number": chunk["page_number"],
+                        "category": category,
+                        "tenant_id": "HSA_Group",  # Set default Tenant ID for group policies
+                        "chunk_id": i,
+                        "language": "ar"
+                    })
+            except Exception as e:
+                logger.error(f"Error processing PDF file {pdf_path.name}", exc_info=True)
+    else:
+        logger.warning(f"HSA_policies directory not found at {hsa_policies_path.absolute()}")
+            
+    if not all_chunks:
+        logger.warning("No documents found to ingest. Pipeline completed with empty state.")
+        return
+        
+    # 3. Initialize Qdrant Client in local file-based mode
     try:
         from qdrant_client import QdrantClient
         
@@ -98,39 +91,12 @@ def ingest_documents() -> None:
         logger.error("Failed to initialize Qdrant Client", exc_info=True)
         raise VectorDBError(f"Qdrant DB connection failed: {e}")
         
-    # 3. Read raw files
-    all_chunks = []
-    all_metadata = []
-    
-    for file_path in raw_docs_path.glob("*.txt"):
-        try:
-            logger.info(f"Processing document: {file_path.name}")
-            with open(file_path, "r", encoding="utf-8") as f:
-                text = f.read()
-                
-            chunks = chunk_text(text)
-            logger.info(f"Split {file_path.name} into {len(chunks)} chunks.")
-            
-            for i, chunk in enumerate(chunks):
-                all_chunks.append(chunk)
-                all_metadata.append({
-                    "source": file_path.name,
-                    "chunk_id": i,
-                    "content_preview": chunk[:50] + "..."
-                })
-        except Exception as e:
-            logger.error(f"Error reading file {file_path.name}", exc_info=True)
-            
-    if not all_chunks:
-        logger.warning("No documents found to ingest. Pipeline completed with empty state.")
-        return
-        
     # 4. Upsert into Qdrant using fastembed locally
     try:
         collection_name = settings.vector_db.collection_name
         logger.info(f"Re-creating/updating Qdrant collection: '{collection_name}'...")
         
-        # client.add handles everything: collection creation, model loading (fastembed), embedding, and upserting.
+        # client.add handles everything: collection creation, model loading, embedding, and upserting.
         # It runs entirely locally on CPU and is incredibly efficient!
         client.add(
             collection_name=collection_name,
@@ -140,7 +106,7 @@ def ingest_documents() -> None:
         
         logger.info(
             "Ingestion completed successfully!", 
-            extra_fields={"collection": collection_name, "total_chunks_indexed": len(all_chunks)}
+            extra={"collection": collection_name, "total_chunks_indexed": len(all_chunks)}
         )
     except Exception as e:
         logger.error(f"Ingestion failed during Qdrant upsert", exc_info=True)

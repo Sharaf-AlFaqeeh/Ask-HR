@@ -83,7 +83,11 @@ class RAGRetriever:
                 # Retrieve document text from chunk
                 doc_text = res.document
                 source = res.metadata.get("source", "Unknown Policy")
-                context_blocks.append(f"[مصدر: {source}]\n{doc_text}")
+                page_num = res.metadata.get("page_number")
+                if page_num:
+                    context_blocks.append(f"[مصدر: {source} (صفحة {page_num})]\n{doc_text}")
+                else:
+                    context_blocks.append(f"[مصدر: {source}]\n{doc_text}")
                 
             return "\n\n---\n\n".join(context_blocks)
             
