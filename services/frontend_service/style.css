@@ -377,6 +377,79 @@ body[dir="rtl"] .header-action-btn {
     color: var(--text-primary);
 }
 
+/* --- THEME TOGGLE PILL --- */
+.theme-toggle-pill {
+    display: flex;
+    align-items: center;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 2px;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    height: 32px;
+    width: 120px;
+    transition: var(--transition-smooth);
+}
+
+.theme-toggle-pill:hover {
+    border-color: var(--hsa-gold-glow);
+}
+
+.theme-pill-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    z-index: 2;
+    transition: var(--transition-smooth);
+    height: 100%;
+    border-radius: 18px;
+}
+
+.theme-pill-active-bg {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    width: calc(50% - 2px);
+    background: linear-gradient(135deg, var(--hsa-gold), var(--hsa-gold-dark));
+    border-radius: 18px;
+    z-index: 1;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 6px rgba(212, 175, 55, 0.2);
+}
+
+/* LTR layout alignment */
+body[dir="ltr"] .theme-pill-active-bg {
+    left: 2px;
+    transform: translateX(0);
+}
+body[dir="ltr"].light-theme .theme-pill-active-bg {
+    transform: translateX(100%);
+}
+
+/* RTL layout alignment */
+body[dir="rtl"] .theme-pill-active-bg {
+    right: 2px;
+    transform: translateX(0);
+}
+body[dir="rtl"].light-theme .theme-pill-active-bg {
+    transform: translateX(-100%);
+}
+
+/* Active states text colors */
+body:not(.light-theme) #theme-pill-dark {
+    color: var(--hsa-navy-dark) !important;
+}
+body.light-theme #theme-pill-light {
+    color: var(--hsa-navy-dark) !important;
+}
+
 .control-badge {
     position: absolute;
     top: -4px;
@@ -1569,6 +1642,11 @@ body.light-theme .suggested-chip:hover {
     background: rgba(212, 175, 55, 0.08);
     border-color: var(--hsa-gold);
     color: #b8860b;
+}
+
+body.light-theme .theme-toggle-pill {
+    background-color: #f1f5f9;
+    border-color: #e2e8f0;
 }
 
 

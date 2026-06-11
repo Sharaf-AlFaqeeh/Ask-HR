@@ -588,21 +588,14 @@ function addActivityRow(user, activityText, status, latency) {
 // -------------------- THEME TOGGLE LOGIC --------------------
 function toggleTheme() {
     const body = document.body;
-    const icon = document.getElementById('theme-toggle-icon');
     
     if (body.classList.contains('light-theme')) {
         body.classList.remove('light-theme');
-        if (icon) {
-            icon.className = 'fa-solid fa-sun';
-        }
         localStorage.setItem('theme', 'dark');
         addConsoleLog('تم التحويل إلى المظهر الداكن.', 'info');
         updateChartTheme(false);
     } else {
         body.classList.add('light-theme');
-        if (icon) {
-            icon.className = 'fa-solid fa-moon';
-        }
         localStorage.setItem('theme', 'light');
         addConsoleLog('تم التحويل إلى المظهر الفاتح.', 'info');
         updateChartTheme(true);
@@ -612,13 +605,9 @@ function toggleTheme() {
 function loadSavedTheme() {
     const savedTheme = localStorage.getItem('theme');
     const body = document.body;
-    const icon = document.getElementById('theme-toggle-icon');
     
     if (savedTheme === 'light') {
         body.classList.add('light-theme');
-        if (icon) {
-            icon.className = 'fa-solid fa-moon';
-        }
         setTimeout(() => updateChartTheme(true), 200);
     }
 }

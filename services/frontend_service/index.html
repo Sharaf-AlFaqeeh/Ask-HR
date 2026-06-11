@@ -106,8 +106,17 @@
                 <button class="header-action-btn" onclick="triggerIngest()">+ تحديث الفهرس</button>
 
                 <div class="header-controls">
-                    <div class="control-icon" id="theme-toggle" onclick="toggleTheme()" title="تبديل المظهر (Light/Dark Mode)">
-                        <i class="fa-solid fa-sun" id="theme-toggle-icon"></i>
+                    <!-- Premium Theme Toggle Pill Switch -->
+                    <div class="theme-toggle-pill" id="theme-toggle-pill" onclick="toggleTheme()" title="تبديل المظهر (Light/Dark Mode)">
+                        <div class="theme-pill-active-bg"></div>
+                        <span class="theme-pill-btn" id="theme-pill-dark">
+                            <i class="fa-solid fa-moon"></i>
+                            <span>داكن</span>
+                        </span>
+                        <span class="theme-pill-btn" id="theme-pill-light">
+                            <i class="fa-solid fa-sun"></i>
+                            <span>فاتح</span>
+                        </span>
                     </div>
                     <div class="control-icon">
                         <i class="fa-solid fa-bell"></i>
