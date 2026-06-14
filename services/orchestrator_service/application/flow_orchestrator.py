@@ -74,6 +74,38 @@ class FlowOrchestrator:
             confidence = 1.0
         nlp_duration = time.time() - nlp_start
 
+        # 2.5. Intercept SAP actions — system cannot process transactional requests yet.
+        #      Redirect the user to contact HR directly via phone.
+        if intent == "SAP":
+            redirect_response = (
+                "مرحباً 👋\n\n"
+                "حالياً لا يمكنني تنفيذ هذا الإجراء من خلال النظام.\n"
+                "لتقديم طلب إجازة أو أي إجراء آخر، يرجى التواصل مع قسم الموارد البشرية على الرقم التالي:\n\n"
+                "📞 **123456789**\n\n"
+                "سيسعد فريق الموارد البشرية بمساعدتك! 😊"
+            )
+            session.add_message(role="assistant", content=redirect_response)
+            # Clear any pending SAP action to avoid stale state
+            session.pending_action = None
+            self.session_store.save_session(session)
+
+            total_duration = time.time() - start_time
+            logger.info(
+                f"SAP action intercepted — redirecting user to HR phone contact. "
+                f"total={total_duration:.3f}s"
+            )
+
+            return self._build_response_payload(
+                query=query,
+                intent=intent,
+                confidence=confidence,
+                entities={},
+                response=redirect_response,
+                context_used=False,
+                sap_executed=False,
+                session_pending=False
+            )
+
         # 3. Pass to Dialog Manager (Slot Filling / Dialog state)
         dialog_start = time.time()
         missing_prompt, action_params = self.dialog_manager.process_dialog_turn(

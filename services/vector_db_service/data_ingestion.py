@@ -1,3 +1,4 @@
+# services/vector_db_service/data_ingestion.py
 import os
 import sys
 from pathlib import Path
@@ -10,7 +11,9 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from core.logger import get_logger
 from core.config_manager import get_settings
 from core.exceptions import VectorDBError
-from services.vector_db_service.preprocessing.cleaner import extract_text_from_pdf, clean_arabic_text
+
+# تأكد من تحديث هذه الدوال في ملفات cleaner.py و chunker.py بناءً على الكود المحسن السابق
+from services.vector_db_service.preprocessing.cleaner import extract_and_clean_pdf
 from services.vector_db_service.preprocessing.chunker import chunk_document_pages
 
 logger = get_logger("vector_db_service")
@@ -18,12 +21,12 @@ settings = get_settings()
 
 def ingest_documents() -> None:
     """
-    Reads local HR policy PDFs and text files, cleans/chunks them, and ingests into Qdrant.
+    Reads local HR policy PDFs, extracts and cleans Arabic text accurately,
+    chunks them using LangChain, and ingests into Qdrant with Multilingual Embeddings.
     """
     # 1. Setup paths
     db_service_dir = Path(__file__).parent
     hsa_policies_path = db_service_dir / "HSA_policies"
-    # raw_docs_path = db_service_dir / "raw_documents"
     qdrant_db_path = Path(settings.vector_db.storage_path)
     
     logger.info("Initializing Data Ingestion Pipeline...")
@@ -32,7 +35,7 @@ def ingest_documents() -> None:
     all_chunks = []
     all_metadata = []
     
-    # Process PDF files inside HSA_policies directories (Real System Data)
+    # Process PDF files inside HSA_policies directories
     if hsa_policies_path.exists():
         logger.info(f"Scanning for PDF policies in {hsa_policies_path.absolute()}")
         for pdf_path in hsa_policies_path.rglob("*.pdf"):
@@ -40,24 +43,15 @@ def ingest_documents() -> None:
                 category = pdf_path.parent.name
                 logger.info(f"Processing PDF document: {pdf_path.name} in category: {category}")
                 
-                # Extract page data
-                pages_data = extract_text_from_pdf(pdf_path)
+                # استخدام الدالة المدمجة الجديدة للاستخراج والتنظيف وإصلاح اللغة العربية
+                pages_data = extract_and_clean_pdf(pdf_path)
                 if not pages_data:
                     logger.warning(f"No text extracted from PDF: {pdf_path.name}")
                     continue
                 
-                # Clean text for each page
-                cleaned_pages = []
-                for p in pages_data:
-                    cleaned_text = clean_arabic_text(p["text"])
-                    if cleaned_text:
-                        cleaned_pages.append({
-                            "page_number": p["page_number"],
-                            "text": cleaned_text
-                        })
-                
-                # Segment pages into chunks
-                chunks = chunk_document_pages(cleaned_pages, chunk_size=600, overlap=100)
+                # تقسيم النصوص باستخدام دالة LangChain الجديدة
+                # لاحظ أننا نمرر chunk_overlap الآن لضمان التداخل
+                chunks = chunk_document_pages(pages_data, chunk_size=600, chunk_overlap=100)
                 logger.info(f"Segmented {pdf_path.name} into {len(chunks)} chunks.")
                 
                 for i, chunk in enumerate(chunks):
@@ -66,7 +60,7 @@ def ingest_documents() -> None:
                         "source": pdf_path.name,
                         "page_number": chunk["page_number"],
                         "category": category,
-                        "tenant_id": "HSA_Group",  # Set default Tenant ID for group policies
+                        "tenant_id": "HSA_Group",  
                         "chunk_id": i,
                         "language": "ar"
                     })
@@ -94,10 +88,17 @@ def ingest_documents() -> None:
     # 4. Upsert into Qdrant using fastembed locally
     try:
         collection_name = settings.vector_db.collection_name
-        logger.info(f"Re-creating/updating Qdrant collection: '{collection_name}'...")
         
-        # client.add handles everything: collection creation, model loading, embedding, and upserting.
-        # It runs entirely locally on CPU and is incredibly efficient!
+        # [تعديل هام 1]: إجبار Qdrant على استخدام نموذج متعدد اللغات لفهم العربية
+        logger.info("Setting Multilingual Embedding Model...")
+        client.set_model("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+        
+        # [تعديل هام 2]: حذف المجموعة القديمة لتجنب تعارض المتجهات بين النماذج
+        if client.collection_exists(collection_name):
+            logger.info(f"Deleting existing collection '{collection_name}' to apply new embedding model...")
+            client.delete_collection(collection_name=collection_name)
+        
+        logger.info(f"Re-creating/updating Qdrant collection: '{collection_name}'...")
         client.add(
             collection_name=collection_name,
             documents=all_chunks,
@@ -111,6 +112,11 @@ def ingest_documents() -> None:
     except Exception as e:
         logger.error(f"Ingestion failed during Qdrant upsert", exc_info=True)
         raise VectorDBError(f"Qdrant Ingestion Error: {e}")
+    finally:
+        # [تعديل هام 3]: الإغلاق الآمن في جميع الحالات لمنع أخطاء ويندوز
+        logger.info("Closing Qdrant Client connection...")
+        if 'client' in locals():
+            client.close()
 
 if __name__ == "__main__":
     ingest_documents()
