@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,13 +9,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <!-- Link to premium styles -->
     <link rel="stylesheet" href="/style.css">
-    
+
     <!-- Chart.js for real-time visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
     <div class="ambient-glow-1"></div>
     <div class="ambient-glow-2"></div>
@@ -32,12 +34,15 @@
                                 <stop offset="100%" stop-color="#B38F24" />
                             </linearGradient>
                         </defs>
-                        <text x="5" y="28" font-family="'Outfit', sans-serif" font-weight="900" font-size="26" fill="url(#gold-grad)" letter-spacing="-1">HSA</text>
-                        <path d="M 5 32 Q 55 38 105 32" fill="none" stroke="#0056b3" stroke-width="3.5" stroke-linecap="round" />
-                        <path d="M 45 32 Q 75 35 105 32" fill="none" stroke="url(#gold-grad)" stroke-width="2.5" stroke-linecap="round" />
+                        <text x="5" y="28" font-family="'Outfit', sans-serif" font-weight="900" font-size="26"
+                            fill="url(#gold-grad)" letter-spacing="-1">HSA</text>
+                        <path d="M 5 32 Q 55 38 105 32" fill="none" stroke="#0056b3" stroke-width="3.5"
+                            stroke-linecap="round" />
+                        <path d="M 45 32 Q 75 35 105 32" fill="none" stroke="url(#gold-grad)" stroke-width="2.5"
+                            stroke-linecap="round" />
                     </svg>
                     <span class="logo-divider">|</span>
-                    <span class="logo-app-title">AskHR <span class="pro-tag">PRO</span></span>
+                    <!-- <span class="logo-app-title">AskHR <span class="pro-tag">PRO</span></span> -->
                 </div>
                 <div class="sidebar-subtitle">HSA GROUP CORPORATE AI SUITE</div>
             </div>
@@ -46,25 +51,25 @@
                 <li class="nav-item">
                     <div class="nav-link active" id="nav-dashboard" onclick="switchView('dashboard')">
                         <i class="fa-solid fa-chart-simple"></i>
-                        <span>لوحة الإحصائيات (Dashboard)</span>
+                        <span>لوحة الإحصائيات </span>
                     </div>
                 </li>
                 <li class="nav-item">
                     <div class="nav-link" id="nav-assistant" onclick="switchView('assistant')">
                         <i class="fa-solid fa-comment-dots"></i>
-                        <span>المساعد الذكي (Assistant)</span>
+                        <span>المساعد الذكي </span>
                     </div>
                 </li>
                 <li class="nav-item">
                     <div class="nav-link" id="nav-settings" onclick="switchView('settings')">
                         <i class="fa-solid fa-sliders"></i>
-                        <span>إعدادات النظام (Settings)</span>
+                        <span>إعدادات النظام </span>
                     </div>
                 </li>
             </ul>
 
             <div class="upgrade-card">
-                <div class="upgrade-title">HSA Group Workspace Pro</div>
+                <!-- <div class="upgrade-title">HSA Group Workspace</div> -->
                 <button class="upgrade-btn">Active Mode</button>
             </div>
 
@@ -86,9 +91,9 @@
             <header class="top-header">
                 <div class="logo-area">
                     <div class="logo-wrapper">
-                        <span class="logo-hsa-text">HSA Group</span>
+                        <span class="header-brand">AskHR</span>
                         <span class="logo-divider">|</span>
-                        <span class="header-brand">AskHR Pro</span>
+                        <span class="logo-hsa-text">HSA</span>
                     </div>
                 </div>
 
@@ -98,8 +103,10 @@
                 </div>
 
                 <div class="header-tabs">
-                    <div class="header-tab active" id="header-tab-overview" onclick="switchView('dashboard')">نظرة عامة (Overview)</div>
-                    <div class="header-tab" id="header-tab-assistant" onclick="switchView('assistant')">المساعد الذكي</div>
+                    <div class="header-tab active" id="header-tab-overview" onclick="switchView('dashboard')">نظرة عامة
+                    </div>
+                    <div class="header-tab" id="header-tab-assistant" onclick="switchView('assistant')">المساعد الذكي
+                    </div>
                     <div class="header-tab" onclick="switchView('settings')">الإعدادات والتفويض</div>
                 </div>
 
@@ -107,7 +114,8 @@
 
                 <div class="header-controls">
                     <!-- Premium Theme Toggle Pill Switch -->
-                    <div class="theme-toggle-pill" id="theme-toggle-pill" onclick="toggleTheme()" title="تبديل المظهر (Light/Dark Mode)">
+                    <div class="theme-toggle-pill" id="theme-toggle-pill" onclick="toggleTheme()"
+                        title="تبديل المظهر (Light/Dark Mode)">
                         <div class="theme-pill-active-bg"></div>
                         <span class="theme-pill-btn" id="theme-pill-dark">
                             <i class="fa-solid fa-moon"></i>
@@ -138,12 +146,13 @@
                 <div class="page-section-header">
                     <div>
                         <h2 class="page-title">مراقبة النظام والأداء العام</h2>
-                        <span class="page-subtitle">أداء محرك أوركسترا الذكاء الاصطناعي ومعدلات طلبات الموظفين الفورية.</span>
+                        <span class="page-subtitle">أداء محرك أوركسترا الذكاء الاصطناعي ومعدلات طلبات الموظفين
+                            الفورية.</span>
                     </div>
                     <div class="page-actions">
                         <button class="btn-card" onclick="triggerIngest()">
                             <i class="fa-solid fa-arrows-rotate"></i>
-                            <span>تحديث الفهرس (Ingest)</span>
+                            <span>تحديث الفهرس</span>
                         </button>
                         <button class="btn-card" onclick="startNewSession()">
                             <i class="fa-solid fa-trash-can"></i>
@@ -217,7 +226,8 @@
                             <div class="uptime-ring">
                                 <svg width="50" height="50">
                                     <circle class="bg" cx="25" cy="25" r="21" />
-                                    <circle class="bar" cx="25" cy="25" r="21" stroke-dasharray="132" stroke-dashoffset="0.13" />
+                                    <circle class="bar" cx="25" cy="25" r="21" stroke-dasharray="132"
+                                        stroke-dashoffset="0.13" />
                                 </svg>
                                 <span class="uptime-value">99.9%</span>
                             </div>
@@ -227,9 +237,11 @@
                             </div>
                         </div>
                         <div class="card-subtext">
-                            <span>زمن الاستجابة: </span><strong id="metrics-latency-val" style="color:#fff; font-family:var(--font-numeric);">34ms</strong>
+                            <span>زمن الاستجابة: </span><strong id="metrics-latency-val"
+                                style="color:#fff; font-family:var(--font-numeric);">34ms</strong>
                             <span style="margin: 0 0.5rem">|</span>
-                            <span>الضغط: </span><strong style="color:#fff; font-family:var(--font-numeric);">12%</strong>
+                            <span>الضغط: </span><strong
+                                style="color:#fff; font-family:var(--font-numeric);">12%</strong>
                         </div>
                     </div>
                 </div>
@@ -241,7 +253,8 @@
                         <div class="split-card-header">
                             <div>
                                 <h3 class="split-card-title">حجم حركة مرور البيانات (Traffic Volume)</h3>
-                                <span class="split-card-subtitle">مراقبة فورية لمعدلات زمن معالجة الطلبات بالملي ثانية.</span>
+                                <span class="split-card-subtitle">مراقبة فورية لمعدلات زمن معالجة الطلبات بالملي
+                                    ثانية.</span>
                             </div>
                             <div class="swapper-pills">
                                 <button class="swapper-pill active">يومي</button>
@@ -311,7 +324,8 @@
                     <div class="split-card-header">
                         <div>
                             <h3 class="split-card-title">آخر العمليات والتفاعلات الجارية</h3>
-                            <span class="split-card-subtitle">تفاصيل استدعاءات الموظفين المباشرة لخدمة الاسترجاع RAG ونظام SAP.</span>
+                            <span class="split-card-subtitle">تفاصيل استدعاءات الموظفين المباشرة لخدمة الاسترجاع RAG
+                                ونظام SAP.</span>
                         </div>
                     </div>
                     <div class="activity-table-wrapper">
@@ -373,18 +387,23 @@
                             </div>
                             <h2>مرحباً بك في نظام AskHR Enterprise الذكي</h2>
                             <p style="color: var(--text-secondary); max-width: 450px; margin: 0.5rem 0 1.5rem;">
-                                المحرك الآلي للموارد البشرية لمجموعة هائل سعيد أنعم (HSA Group). اسألني عن السياسات أو اطلب تنفيذ إجازة.
+                                المحرك الآلي للموارد البشرية لمجموعة هائل سعيد أنعم (HSA Group). اسألني عن السياسات أو
+                                اطلب تنفيذ إجازة.
                             </p>
                             <div class="suggested-chips">
-                                <div class="suggested-chip" onclick="sendQuery('ما هي سياسة الإجازة السنوية؟')">ما هي سياسة الإجازة السنوية؟</div>
-                                <div class="suggested-chip" onclick="sendQuery('أريد تقديم طلب إجازة سنوية')">أريد تقديم طلب إجازة سنوية</div>
-                                <div class="suggested-chip" onclick="sendQuery('ما هي تفاصيل بدل السكن؟')">ما هي تفاصيل بدل السكن؟</div>
+                                <div class="suggested-chip" onclick="sendQuery('ما هي سياسة الإجازة السنوية؟')">ما هي
+                                    سياسة الإجازة السنوية؟</div>
+                                <div class="suggested-chip" onclick="sendQuery('أريد تقديم طلب إجازة سنوية')">أريد تقديم
+                                    طلب إجازة سنوية</div>
+                                <div class="suggested-chip" onclick="sendQuery('ما هي تفاصيل بدل السكن؟')">ما هي تفاصيل
+                                    بدل السكن؟</div>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="chat-input-panel">
-                        <input type="text" class="chat-input" id="chat-input" placeholder="اكتب استفسارك هنا..." onkeydown="if(event.key === 'Enter') handleSend()">
+                        <input type="text" class="chat-input" id="chat-input" placeholder="اكتب استفسارك هنا..."
+                            onkeydown="if(event.key === 'Enter') handleSend()">
                         <button class="send-btn" onclick="handleSend()" id="send-btn">
                             <i class="fa-solid fa-paper-plane" style="transform: rotate(180deg);" id="send-icon"></i>
                         </button>
@@ -401,7 +420,7 @@
                                 <span>مراقب الحالة (State Tracker)</span>
                             </div>
                         </div>
-                        
+
                         <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1;">
                             <div class="state-row">
                                 <span class="state-label">Session ID</span>
@@ -419,13 +438,15 @@
                                 <span class="state-label">المستأجر (Tenant ID)</span>
                                 <span class="state-value" id="state-tenant">HSAGroup</span>
                             </div>
-                            
-                            <div style="margin-top: 1.25rem; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 1rem;">
-                                <h4 style="font-size: 0.85rem; color: #a5b4fc; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+
+                            <div
+                                style="margin-top: 1.25rem; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 1rem;">
+                                <h4
+                                    style="font-size: 0.85rem; color: #a5b4fc; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
                                     <i class="fa-solid fa-list-check" style="font-size: 0.75rem;"></i>
                                     تعبئة البيانات (Slot Filling)
                                 </h4>
-                                
+
                                 <div class="state-row">
                                     <span class="state-label">الرقم الوظيفي (Employee ID)</span>
                                     <span id="slot-employee-id" class="badge badge-none">مفقود</span>
@@ -444,14 +465,20 @@
                                 </div>
                             </div>
 
-                            <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.05);">
-                                <h4 style="font-size: 0.85rem; color: #a5b4fc; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <div
+                                style="margin-top: auto; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+                                <h4
+                                    style="font-size: 0.85rem; color: #a5b4fc; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
                                     <i class="fa-solid fa-database" style="font-size: 0.75rem;"></i>
                                     العمليات الحالية
                                 </h4>
                                 <div style="display: flex; gap: 0.5rem;">
-                                    <span id="op-rag" class="badge badge-none" style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem;">RAG Retriever</span>
-                                    <span id="op-sap" class="badge badge-none" style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem;">SAP SF Gateway</span>
+                                    <span id="op-rag" class="badge badge-none"
+                                        style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem;">RAG
+                                        Retriever</span>
+                                    <span id="op-sap" class="badge badge-none"
+                                        style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem;">SAP SF
+                                        Gateway</span>
                                 </div>
                             </div>
                         </div>
@@ -465,44 +492,56 @@
                     <!-- Access Token settings -->
                     <div class="settings-card">
                         <h3 class="settings-title">المصادقة والتحقق من الوصول</h3>
-                        <p class="settings-desc">إعدادات كلمات المرور ومفاتيح التوثيق الخاصة بالاتصال بخوادم أوركسترا الموارد البشرية.</p>
-                        
+                        <p class="settings-desc">إعدادات كلمات المرور ومفاتيح التوثيق الخاصة بالاتصال بخوادم أوركسترا
+                            الموارد البشرية.</p>
+
                         <div class="form-group">
                             <label>رمزBearer للمطور (Static Authorization Key)</label>
-                            <input type="text" id="auth-token" value="askhr_super_secret_token_2026" onchange="addConsoleLog('تم تحديث مفتاح الوصول Authentication Token', 'info')">
+                            <input type="text" id="auth-token" value="askhr_super_secret_token_2026"
+                                onchange="addConsoleLog('تم تحديث مفتاح الوصول Authentication Token', 'info')">
                         </div>
                     </div>
 
                     <!-- Admin controls panel -->
                     <div class="settings-card">
                         <h3 class="settings-title">إجراءات المدير والعمليات الخلفية</h3>
-                        <p class="settings-desc">أدوات إدارية خاصة بتهيئة قاعدة البيانات Vector DB وحذف جلسات الذاكرة المؤقتة.</p>
-                        
+                        <p class="settings-desc">أدوات إدارية خاصة بتهيئة قاعدة البيانات Vector DB وحذف جلسات الذاكرة
+                            المؤقتة.</p>
+
                         <div class="action-group">
-                            <button class="btn-card btn-admin" onclick="triggerIngest()" id="btn-ingest" style="background-color: var(--accent-admin); width: 100%; justify-content: center; color: white;">
+                            <button class="btn-card btn-admin" onclick="triggerIngest()" id="btn-ingest"
+                                style="background-color: var(--accent-admin); width: 100%; justify-content: center; color: white;">
                                 <i class="fa-solid fa-sync"></i>
                                 إعادة بناء فهرس المستندات (Ingest Vector DB)
                             </button>
-                            
-                            <div style="border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 1rem; padding-top: 1rem;">
-                                <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem; display: block; font-weight: 600;">مسح بيانات جلسة محددة من الذاكرة:</label>
+
+                            <div
+                                style="border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 1rem; padding-top: 1rem;">
+                                <label
+                                    style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem; display: block; font-weight: 600;">مسح
+                                    بيانات جلسة محددة من الذاكرة:</label>
                                 <div style="display: flex; gap: 0.5rem;">
-                                    <input type="text" class="input-style" id="session-clear-id" placeholder="أدخل معرف الجلسة Session ID" style="flex: 1;">
-                                    <button class="btn-card btn-danger" onclick="clearSessionById()" style="background-color: var(--danger); border: none; color: white;">حذف الجلسة</button>
+                                    <input type="text" class="input-style" id="session-clear-id"
+                                        placeholder="أدخل معرف الجلسة Session ID" style="flex: 1;">
+                                    <button class="btn-card btn-danger" onclick="clearSessionById()"
+                                        style="background-color: var(--danger); border: none; color: white;">حذف
+                                        الجلسة</button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Live Terminal Output -->
-                    <div class="settings-card" style="flex: 1; display: flex; flex-direction: column; min-height: 250px;">
+                    <div class="settings-card"
+                        style="flex: 1; display: flex; flex-direction: column; min-height: 250px;">
                         <div class="split-card-header" style="margin-bottom: 0.75rem;">
                             <div>
                                 <h3 class="settings-title">سجل الأحداث والعمليات الفوري (Console Logs)</h3>
                             </div>
-                            <button class="new-chat-btn" onclick="clearConsoleLogs()" style="font-size: 0.75rem; padding: 0.2rem 0.6rem;">مسح السجل</button>
+                            <button class="new-chat-btn" onclick="clearConsoleLogs()"
+                                style="font-size: 0.75rem; padding: 0.2rem 0.6rem;">مسح السجل</button>
                         </div>
-                        
+
                         <div class="console-output" id="console-output">
                             <div class="console-line">
                                 <span class="console-time">[08:56:32]</span>
@@ -524,4 +563,5 @@
     <!-- Link to unified script -->
     <script src="/app.js"></script>
 </body>
+
 </html>

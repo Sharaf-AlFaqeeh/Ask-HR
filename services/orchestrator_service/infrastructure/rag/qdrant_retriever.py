@@ -81,9 +81,16 @@ class QdrantRetrieverAdapter(IRetriever):
             def get_keyword_score(res_item) -> float:
                 doc_text = normalize_arabic(getattr(res_item, "document", "").lower())
                 score = 0.0
+                # رفع وزن الكلمات الأساسية لضمان تطابق السياسة المطلوبة
+                keywords = ["توظيف", "داخلي", "شروط", "نقل"]
+                for kw in keywords:
+                    if kw in doc_text:
+                        score += 3.0 # وزن أعلى للكلمات المفتاحية
+                
+                # تطابق الكلمات من سؤال المستخدم
                 for word in query_words:
                     if word in doc_text:
-                        score += 2.0
+                        score += 1.0
                 return score
 
             # Sort results by keyword score descending, keeping vector similarity as tie-breaker
