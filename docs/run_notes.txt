@@ -108,3 +108,7 @@ Get-Content P:\____AI____\HSAGroup\AskHRPro\logs\llm_inference.log -Tail 20 -Wai
 |--------|--------|--------|
 | LLM Inference | 8000 | http://127.0.0.1:8000 |
 | Orchestrator + UI | 8081 | http://127.0.0.1:8081 |
+
+
+سرفر الواجهة الأمامية : 
+python services/frontend_service/server.py

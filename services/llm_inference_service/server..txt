@@ -191,57 +191,11 @@ def startup_event():
     models_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "models"))
     logger.info(f"📂 Models directory: {models_dir}")
     
-    # List available models (both directories and .gguf files)
+    # List available models
     if os.path.isdir(models_dir):
-        available = [d for d in os.listdir(models_dir) if os.path.isdir(os.path.join(models_dir, d)) or d.endswith(".gguf")]
+        available = [d for d in os.listdir(models_dir) if os.path.isdir(os.path.join(models_dir, d))]
         logger.info(f"📋 Available models: {available if available else '(none found)'}")
     
-    # ── Priority order for local GGUF models inside models_dir (easily customizable) ──
-    GGUF_MODEL_PRIORITY = [
-        "qwen2.5-1.5b-instruct-q4_k_m.gguf",  # First priority (temporary default)
-        "qwen2.5-3b-instruct-q4_k_m.gguf",
-    ]
- 
-    # ── Try prioritized GGUF models via llama-cpp-python first ──
-    for model_name in GGUF_MODEL_PRIORITY:
-        model_path = os.path.join(models_dir, model_name)
-        if not os.path.exists(model_path):
-            logger.debug(f"GGUF Model {model_name} not found at {model_path}, skipping...")
-            continue
-            
-        logger.info(f"🔄 Loading prioritized GGUF model: {model_name}")
-        logger.info(f"   Path: {model_path}")
-        
-        try:
-            import llama_cpp  # type: ignore
-            
-            logger.info(f"   📥 Loading GGUF model into memory...")
-            load_start = time.time()
-            
-            llama_model = llama_cpp.Llama(
-                model_path=model_path,
-                n_ctx=settings.llm.n_ctx,
-                n_threads=settings.llm.n_threads,
-                n_gpu_layers=settings.llm.n_gpu_layers,
-                verbose=False
-            )
-            
-            _model_load_time_sec = round(time.time() - load_start, 2)
-            _model_name_loaded = model_name
-            _engine_type = "llama_cpp"
-            mock_mode = False
-            
-            logger.info("═" * 60)
-            logger.info(f"✅ GGUF MODEL LOADED SUCCESSFULLY")
-            logger.info(f"   Model: {model_name}")
-            logger.info(f"   Engine: llama-cpp-python")
-            logger.info(f"   Load Time: {_model_load_time_sec}s")
-            logger.info(f"   Context: {settings.llm.n_ctx}, Threads: {settings.llm.n_threads}")
-            logger.info("═" * 60)
-            return
-        except Exception as e:
-            logger.error(f"❌ Failed to load prioritized GGUF model {model_name}: {e}", exc_info=True)
-
     # ── Priority order: prefer non-quantized models that work on CPU with low RAM ──
     CPU_MODEL_PRIORITY = [
         "Qwen2.5-0.5B-Instruct",   # ~2 GB RAM, non-quantized, fast on CPU
@@ -520,10 +474,9 @@ def _handle_transformers_inference(request: ChatCompletionRequest, request_id: s
     generated_ids = model.generate(
         **inputs,
         max_new_tokens=max_t,
-        temperature=0.01,         # اجعلها قريبة من الصفر للصرامة
-        do_sample=False,          # استخدم التوليد الحتمي (Greedy) بدلاً من العشوائي
-        repetition_penalty=1.5,   # ارفع العقوبة إلى 1.5 لمنع تكرار الجمل
-        no_repeat_ngram_size=2    # هذا السطر سيمنع النموذج من تكرار نفس الكلمات مرتين
+        temperature=temp,
+        do_sample=True if temp > 0 else False,
+        repetition_penalty=1.1
     )
     
     duration = round(time.time() - start_time, 3)

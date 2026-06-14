@@ -1,3 +1,4 @@
+# services/orchestrator_service/infrastructure/rag/qdrant_retriever.py
 import os
 from pathlib import Path
 from services.orchestrator_service.domain.interfaces import IRetriever
@@ -29,6 +30,7 @@ class QdrantRetrieverAdapter(IRetriever):
             from qdrant_client import QdrantClient
             logger.info(f"Connecting Qdrant Adapter to: {self.qdrant_path.absolute()}")
             self.client = QdrantClient(path=str(self.qdrant_path))
+            self.client.set_model("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
         except Exception as e:
             logger.error("Failed to connect Qdrant Client", exc_info=True)
             self.client = None
@@ -90,9 +92,14 @@ class QdrantRetrieverAdapter(IRetriever):
             context_blocks = []
             for res in results:
                 # If chunk has tenant metadata, we filter manually here or via Qdrant query filter
-                chunk_tenant = res.metadata.get("tenant_id", "HSAGroup")
+                chunk_tenant = res.metadata.get("tenant_id", "HSA_Group")
+                # Treat "HSAGroup" and "HSA_Group" as equivalent to support both keys seamlessly.
+                is_tenant_match = (
+                    chunk_tenant == tenant_id or
+                    (chunk_tenant in ("HSAGroup", "HSA_Group") and tenant_id in ("HSAGroup", "HSA_Group"))
+                )
                 # For safety in multi-tenant mode, only display if it matches tenant or matches a global company policy
-                if chunk_tenant == tenant_id or chunk_tenant == "HSAGroup":
+                if is_tenant_match or chunk_tenant in ("HSAGroup", "HSA_Group"):
                     source = res.metadata.get("source", "Unknown Policy")
                     context_blocks.append(f"[مصدر: {source}]\n{res.document}")
                 

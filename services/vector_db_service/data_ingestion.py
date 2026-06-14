@@ -60,7 +60,7 @@ def ingest_documents() -> None:
                         "source": pdf_path.name,
                         "page_number": chunk["page_number"],
                         "category": category,
-                        "tenant_id": "HSA_Group",  
+                        "tenant_id": "HSAGroup",  
                         "chunk_id": i,
                         "language": "ar"
                     })
