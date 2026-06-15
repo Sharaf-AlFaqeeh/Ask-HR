@@ -50,12 +50,17 @@
     padding: 0;
 }
 
+html, body, #root {
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    position: relative;
+}
+
 body {
     font-family: var(--font-main);
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    height: 100vh;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
 }
@@ -950,6 +955,8 @@ body[dir="ltr"] .activity-table {
     display: flex;
     flex-direction: column;
     padding: 1.5rem;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .assistant-main-panel {

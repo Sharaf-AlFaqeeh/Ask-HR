@@ -103,11 +103,14 @@ class SessionManager:
         field_desc = self.FIELD_NAMES_AR.get(next_field, next_field)
         
         # Customize prompt based on action
-        if pending.action_name == "request_leave":
-            prompt = f"لتسجيل طلب الإجازة في نظام SAP، يرجى تزويدي بـ: **{field_desc}**."
-        elif pending.action_name == "get_salary_slip":
-            prompt = f"للحصول على كشف الراتب من نظام SAP، يرجى تزويدي بـ: **{field_desc}**."
-        else: # get_profile
-            prompt = f"لعرض ملف الموظف في نظام SAP، يرجى تزويدي بـ: **{field_desc}**."
+        # The user requested to replace slot-filling prompts with a redirect response
+        session.pending_action = None
+        prompt = (
+            "مرحباً 👋\n\n"
+            "حالياً لا يمكنني تنفيذ هذا الإجراء من خلال النظام.\n"
+            "لتقديم طلب إجازة أو أي إجراء آخر، يرجى التواصل مع مركز الخدمة للموارد البشرية على الرقم التالي:\n\n"
+            "📞 **123456789**\n\n"
+            "سيسعد فريق الموارد البشرية بمساعدتك! 😊"
+        )
             
         return prompt, None

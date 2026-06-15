@@ -21,8 +21,10 @@ export default function App() {
 
   return (
     <>
-      <div className="ambient-glow-1"></div>
-      <div className="ambient-glow-2"></div>
+      <div className="ambient-glow-container" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+        <div className="ambient-glow-1"></div>
+        <div className="ambient-glow-2"></div>
+      </div>
 
       <div className="app-layout">
         <Sidebar />
