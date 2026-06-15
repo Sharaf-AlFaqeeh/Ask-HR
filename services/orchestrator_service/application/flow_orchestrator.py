@@ -74,9 +74,10 @@ class FlowOrchestrator:
             confidence = 1.0
         nlp_duration = time.time() - nlp_start
 
-        # 2.5. Intercept SAP actions — system cannot process transactional requests yet.
+        # 2.5. Intercept SAP actions in production — system cannot process transactional requests yet.
         #      Redirect the user to contact HR directly via phone.
-        if intent == "SAP":
+        #      In mock mode (development), we allow the full multi-turn dialog flow for demonstration.
+        if intent == "SAP" and not self.settings.sap.mock_mode:
             redirect_response = (
                 "مرحباً 👋\n\n"
                 "حالياً لا يمكنني تنفيذ هذا الإجراء من خلال النظام.\n"
@@ -99,7 +100,7 @@ class FlowOrchestrator:
                 query=query,
                 intent=intent,
                 confidence=confidence,
-                entities={},
+                entities=entities,
                 response=redirect_response,
                 context_used=False,
                 sap_executed=False,

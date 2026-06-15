@@ -9,7 +9,7 @@ from services.orchestrator_service.infrastructure.llm_clients.openai_client impo
 from services.orchestrator_service.rag.retriever import RAGRetriever
 from services.orchestrator_service.application.prompt_registry import PromptRegistry
 
-async def test_rag_llm_integration():
+async def run_rag_llm_integration():
     print("🚀 بدء اختبار التكامل بين قاعدة البيانات المتجهة ونموذج اللغة...")
     
     # 1. تهيئة المكونات
@@ -48,4 +48,4 @@ async def test_rag_llm_integration():
 
 if __name__ == "__main__":
     # تشغيل الدالة غير المتزامنة
-    asyncio.run(test_rag_llm_integration())
+    asyncio.run(run_rag_llm_integration())

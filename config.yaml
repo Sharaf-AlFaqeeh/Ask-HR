@@ -14,7 +14,7 @@ llm:
   # The user will place their local Qwen GGUF file inside services/llm_inference_service/models/
   model_path: "services/llm_inference_service/models/qwen2.5-7b-instruct-q4_k_m.gguf"
   n_ctx: 4096              # Context window size
-  n_threads: 4             # Number of CPU threads to use for local execution
+  n_threads: 8             # Number of CPU threads to use for local execution
   n_gpu_layers: 0          # Number of layers to offload to GPU (0 = CPU only)
   temperature: 0.1         # Lower temperature for precise enterprise responses
   max_tokens: 1024
@@ -36,6 +36,11 @@ orchestrator:
   intent_confidence_threshold: 0.7
   # Use predefined templates for SAP responses to save time/tokens (true/false)
   use_sap_templates: true
+  # NLP analysis mode:
+  #   "rule_first"     — (Default) Rule-based NLP primary, LLM fallback only for ambiguous queries. Best balance.
+  #   "rule_only"      — Never call LLM for intent analysis. Fastest, but no fallback for complex queries.
+  #   "hybrid_always"  — Always run both rule + LLM and merge. Slowest (~5s), use only for debugging.
+  nlp_mode: "rule_first"
 
 # Future SAP SuccessFactors Integration Settings (Mock placeholders)
 sap:

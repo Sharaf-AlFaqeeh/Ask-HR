@@ -57,9 +57,10 @@ class RuleNLPAdapter:
         total = sap_score + rag_score
         
         if total == 0:
-            # Default fallback to RAG with neutral confidence
+            # Default fallback to RAG with 1.0 confidence to avoid calling LLM for intent classification
+            # since general/unrecognized chats will be handled by the final synthesis LLM call anyway.
             intent = "RAG"
-            confidence = 0.5
+            confidence = 1.0
         else:
             confidence = max(sap_score, rag_score) / total
             intent = "SAP" if sap_score >= rag_score else "RAG"

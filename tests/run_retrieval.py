@@ -2,7 +2,7 @@
 
 from qdrant_client import QdrantClient
 
-def test_search():
+def run_search():
     # 1. الاتصال بقاعدة البيانات
     client = QdrantClient(path="./services/vector_db_service/local_qdrant_db")
     
@@ -28,4 +28,4 @@ def test_search():
         print(f"النص المستخرج:\n{result.document}\n")
 
 if __name__ == "__main__":
-    test_search()
+    run_search()

@@ -32,6 +32,8 @@ class OrchestratorSettings(BaseModel):
     llm_api_url: str = "http://127.0.0.1:8000/v1"
     intent_confidence_threshold: float = 0.7
     use_sap_templates: bool = True
+    # NLP analysis mode: "rule_first" (default), "rule_only", or "hybrid_always"
+    nlp_mode: str = "rule_first"
 
 class SAPSettings(BaseModel):
     api_base_url: str = "https://mock.successfactors.eu/odata/v2"
