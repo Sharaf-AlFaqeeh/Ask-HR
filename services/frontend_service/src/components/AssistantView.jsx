@@ -40,7 +40,7 @@ export default function AssistantView() {
               <div className="empty-icon">
                 <i className="fa-solid fa-comments"></i>
               </div>
-              <h2>مرحباً بك في نظام AskHR Enterprise الذكي</h2>
+              <h2>مرحباً بك في نظام AskHR  الذكي</h2>
               <p style={{ color: 'var(--text-secondary)', maxWidth: '450px', margin: '0.5rem 0 1.5rem' }}>
                 المحرك الآلي للموارد البشرية لمجموعة هائل سعيد أنعم (HSA Group)
               </p>
@@ -58,14 +58,15 @@ export default function AssistantView() {
             </div>
           ) : (
             messages.map((msg, index) => (
+
               <div key={index} className={`message-wrapper ${msg.sender}`}>
-                <div className={`message-avatar ${msg.sender}`}>
+                {/* <div className={`message-avatar ${msg.sender}`}>
                   {msg.sender === 'user' ? (
                     <i className="fa-solid fa-user"></i>
                   ) : (
                     <i className="fa-solid fa-brain"></i>
                   )}
-                </div>
+                </div> */}
                 <div className="message-bubble-container">
                   <div className="message-bubble" style={{ whiteSpace: 'pre-line' }}>
                     {msg.text}
@@ -75,12 +76,12 @@ export default function AssistantView() {
                     <div className="engine-pills">
                       {msg.responseData.intent && (
                         <div className="engine-pill rag">
-                          <i className="fa-solid fa-wand-magic-sparkles"></i> Intent: {msg.responseData.intent}
+                          {/* <i className="fa-solid fa-wand-magic-sparkles"></i>{msg.responseData.intent} */}
                         </div>
                       )}
                       {msg.responseData.context_used && (
                         <div className="engine-pill rag">
-                          <i className="fa-solid fa-database"></i> RAG Context
+                          <i className="fa-solid fa-database"></i>
                         </div>
                       )}
                       {msg.responseData.sap_executed && (
@@ -95,15 +96,17 @@ export default function AssistantView() {
                     <span>{msg.time}</span>
                   </div>
                 </div>
+
               </div>
+
             ))
           )}
 
           {isWaitingResponse && (
             <div className="message-wrapper bot">
-              <div className="message-avatar bot">
+              {/* <div className="message-avatar bot">
                 <i className="fa-solid fa-brain"></i>
-              </div>
+              </div> */}
               <div className="message-bubble">
                 <div className="typing-indicator">
                   <div className="typing-dot"></div>

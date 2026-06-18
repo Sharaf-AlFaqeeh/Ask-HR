@@ -53,6 +53,10 @@ services/llm_inference_service/models/
 huggingface/
 hf_cache/
 
+# docs
+docs/
+
+
 # Temporary Files
 
 tmp/
