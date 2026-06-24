@@ -56,12 +56,31 @@ def startup_event():
     get_container()
     logger.info("AskHR Orchestrator service started successfully.")
 
+# pyrefly: ignore [deprecated]
+@app.on_event("shutdown")
+async def shutdown_event():
+    # Retrieve container and trigger clean resource shutdown
+    container = get_container()
+    if hasattr(container.llm_client, "close"):
+        await container.llm_client.close()
+    logger.info("AskHR Orchestrator service shut down successfully.")
+
+from fastapi.staticfiles import StaticFiles
+
 # Register API Routers
 from services.orchestrator_service.api.v1.chat import router as chat_router
 from services.orchestrator_service.api.v1.admin import router as admin_router
 
 app.include_router(chat_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+
+# Mount HSA policies folder to serve PDF files
+hsa_policies_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../vector_db_service/HSA_policies"))
+if os.path.exists(hsa_policies_dir):
+    app.mount("/policies-files", StaticFiles(directory=hsa_policies_dir), name="policies-files")
+    logger.info(f"Mounted policies directory at {hsa_policies_dir}")
+else:
+    logger.warning(f"Policies directory not found at {hsa_policies_dir}")
 
 @app.get("/")
 def read_root():

@@ -9,6 +9,7 @@ from services.orchestrator_service.application.prompt_registry import PromptRegi
 from services.orchestrator_service.application.response_templates import ResponseTemplates
 from core.config_manager import get_settings
 from core.logger import get_logger
+from core.security.tenant import set_tenant_id
 
 logger = get_logger("flow_orchestrator")
 
@@ -43,6 +44,9 @@ class FlowOrchestrator:
         """
         Main entry point for processing a single user query within a session context.
         """
+        # Set tenant ID in context variable for downstream database/API adapters
+        set_tenant_id(tenant_id)
+        
         start_time = time.time()
         logger.info(
             f"Processing message in flow orchestrator", 
@@ -262,10 +266,22 @@ class FlowOrchestrator:
         # 6. RAG Pipeline execution (General Policies)
         else:
             logger.info("Running RAG context retrieval...")
-            context = self.retriever.retrieve_context(query)
+            citations = self.retriever.retrieve_context_with_metadata(query)
             
-            if context:
+            if citations:
                 context_used = True
+                
+                # Format context text for the LLM
+                context_blocks = []
+                for cit in citations:
+                    source = cit["source"]
+                    page_num = cit.get("page_number")
+                    if page_num:
+                        context_blocks.append(f"[مصدر: {source} (صفحة {page_num})]\n{cit['text']}")
+                    else:
+                        context_blocks.append(f"[مصدر: {source}]\n{cit['text']}")
+                context = "\n\n---\n\n".join(context_blocks)
+                
                 system_instructions = PromptRegistry.RAG_SYSTEM_TEMPLATE.format(context=context)
                 
                 # Assemble conversation context including history for better multi-turn interaction
@@ -276,6 +292,7 @@ class FlowOrchestrator:
                 messages.append({"role": "user", "content": query})
                 
                 response_text = await self.llm_client.query_llm(messages)
+                execution_details = {"citations": citations}
             else:
                 logger.warning("No context found in RAG collection. Falling back to default assistant prompt.")
                 messages = [

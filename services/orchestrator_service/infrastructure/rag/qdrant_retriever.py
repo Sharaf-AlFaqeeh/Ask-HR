@@ -66,35 +66,9 @@ class QdrantRetrieverAdapter(IRetriever):
                 return ""
 
             # Helper to normalize common Arabic spelling variations
-            def normalize_arabic(text: str) -> str:
-                return (
-                    text.replace("أ", "ا")
-                    .replace("إ", "ا")
-                    .replace("آ", "ا")
-                    .replace("ة", "ه")
-                    .replace("ى", "ي")
-                )
-
-            # Arabic keyword-overlap re-ranking
-            query_words = [normalize_arabic(w.strip("؟.,!:")) for w in query.lower().split() if len(w.strip("؟.,!:")) > 1]
-            
-            def get_keyword_score(res_item) -> float:
-                doc_text = normalize_arabic(getattr(res_item, "document", "").lower())
-                score = 0.0
-                # رفع وزن الكلمات الأساسية لضمان تطابق السياسة المطلوبة
-                keywords = ["توظيف", "داخلي", "شروط", "نقل"]
-                for kw in keywords:
-                    if kw in doc_text:
-                        score += 3.0 # وزن أعلى للكلمات المفتاحية
-                
-                # تطابق الكلمات من سؤال المستخدم
-                for word in query_words:
-                    if word in doc_text:
-                        score += 1.0
-                return score
-
+            query_words = [self._normalize_arabic(w.strip("؟.,!:")) for w in query.lower().split() if len(w.strip("؟.,!:")) > 1]
             # Sort results by keyword score descending, keeping vector similarity as tie-breaker
-            results = sorted(results, key=get_keyword_score, reverse=True)[:limit]
+            results = sorted(results, key=self._get_keyword_score_fn(query_words), reverse=True)[:limit]
 
             context_blocks = []
             for res in results:
@@ -108,10 +82,93 @@ class QdrantRetrieverAdapter(IRetriever):
                 # For safety in multi-tenant mode, only display if it matches tenant or matches a global company policy
                 if is_tenant_match or chunk_tenant in ("HSAGroup", "HSA_Group"):
                     source = res.metadata.get("source", "Unknown Policy")
-                    context_blocks.append(f"[مصدر: {source}]\n{res.document}")
+                    page_num = res.metadata.get("page_number")
+                    if page_num:
+                        context_blocks.append(f"[مصدر: {source} (صفحة {page_num})]\n{res.document}")
+                    else:
+                        context_blocks.append(f"[مصدر: {source}]\n{res.document}")
                 
             return "\n\n---\n\n".join(context_blocks)
             
         except Exception as e:
             logger.error("Qdrant retrieve_context failed", exc_info=True)
             return ""
+
+    def retrieve_context_with_metadata(self, query: str, limit: int = 3) -> list:
+        if not self.client:
+            logger.warning("Qdrant Client is offline. Returning empty context list.")
+            return []
+
+        tenant_id = get_tenant_id()
+        logger.info(f"Retrieving structured context for query in Qdrant: {self.collection_name} (Tenant: {tenant_id})")
+
+        try:
+            # Check collections
+            collections_info = self.client.get_collections()
+            collection_names = [col.name for col in collections_info.collections]
+            
+            if self.collection_name not in collection_names:
+                logger.warning(f"Collection '{self.collection_name}' does not exist.")
+                return []
+
+            # Retrieve documents
+            results = self.client.query(
+                collection_name=self.collection_name,
+                query_text=query,
+                limit=max(10, limit)
+            )
+            
+            if not results:
+                return []
+
+            query_words = [self._normalize_arabic(w.strip("؟.,!:")) for w in query.lower().split() if len(w.strip("؟.,!:")) > 1]
+            
+            # Sort results by keyword score descending, keeping vector similarity as tie-breaker
+            results = sorted(results, key=self._get_keyword_score_fn(query_words), reverse=True)[:limit]
+
+            citations = []
+            for res in results:
+                chunk_tenant = res.metadata.get("tenant_id", "HSA_Group")
+                is_tenant_match = (
+                    chunk_tenant == tenant_id or
+                    (chunk_tenant in ("HSAGroup", "HSA_Group") and tenant_id in ("HSAGroup", "HSA_Group"))
+                )
+                if is_tenant_match or chunk_tenant in ("HSAGroup", "HSA_Group"):
+                    citations.append({
+                        "source": res.metadata.get("source", "Unknown Policy"),
+                        "category": res.metadata.get("category", "General"),
+                        "page_number": res.metadata.get("page_number", 1),
+                        "text": res.document
+                    })
+                
+            return citations
+            
+        except Exception as e:
+            logger.error("Qdrant retrieve_context_with_metadata failed", exc_info=True)
+            return []
+
+    def _normalize_arabic(self, text: str) -> str:
+        return (
+            text.replace("أ", "ا")
+            .replace("إ", "ا")
+            .replace("آ", "ا")
+            .replace("ة", "ه")
+            .replace("ى", "ي")
+        )
+
+    def _get_keyword_score_fn(self, query_words: list):
+        def get_keyword_score(res_item) -> float:
+            doc_text = self._normalize_arabic(getattr(res_item, "document", "").lower())
+            score = 0.0
+            # رفع وزن الكلمات الأساسية لضمان تطابق السياسة المطلوبة
+            keywords = ["توظيف", "داخلي", "شروط", "نقل"]
+            for kw in keywords:
+                if kw in doc_text:
+                    score += 3.0 # وزن أعلى للكلمات المفتاحية
+            
+            # تطابق الكلمات من سؤال المستخدم
+            for word in query_words:
+                if word in doc_text:
+                    score += 1.0
+            return score
+        return get_keyword_score

@@ -103,6 +103,9 @@ curl http://127.0.0.1:8081/health
 # فتح الواجهة في المتصفح
 Start-Process "http://127.0.0.1:8081"
 
+# صحة نظام RAG 
+curl http://localhost:8081/health
+
 # مشاهدة ملف اللوق مباشرة
 Get-Content P:\____AI____\HSAGroup\AskHRPro\logs\llm_inference.log -Tail 20 -Wait
 ```

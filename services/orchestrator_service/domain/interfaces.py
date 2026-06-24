@@ -16,6 +16,11 @@ class IRetriever(ABC):
         """Retrieves text context relevant to the query from Vector DB."""
         pass
 
+    @abstractmethod
+    def retrieve_context_with_metadata(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
+        """Retrieves text chunks with their associated metadata (source, category, page, etc.)."""
+        pass
+
 class IHRSystemClient(ABC):
     @abstractmethod
     def get_employee_profile(self, employee_id: str) -> EmployeeProfile:

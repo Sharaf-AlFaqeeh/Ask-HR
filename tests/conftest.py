@@ -24,6 +24,14 @@ class MockRetriever(IRetriever):
     def retrieve_context(self, query: str, limit: int = 3) -> str:
         return "[مصدر: اختبار] يحق للموظف إجازة سنوية قدرها 30 يوماً."
 
+    def retrieve_context_with_metadata(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
+        return [{
+            "source": "HR_Policy_Test.pdf",
+            "category": "TestCategory",
+            "page_number": 2,
+            "text": "يحق للموظف إجازة سنوية قدرها 30 يوماً."
+        }]
+
 class MockHRSystemClient(IHRSystemClient):
     def get_employee_profile(self, employee_id: str) -> EmployeeProfile:
         return EmployeeProfile(

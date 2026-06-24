@@ -18,7 +18,16 @@ class OpenAICompatibleLLMClient(ILLMClient):
         self.api_url = f"{settings.orchestrator.llm_api_url}/chat/completions"
         self.default_temp = settings.llm.temperature
         self.default_max_tokens = settings.llm.max_tokens
+        # Persistent async client for connection pooling/reuse
+        self.client = httpx.AsyncClient(timeout=120.0)
         logger.info(f"Initializing LLM Adapter targeting API at: {self.api_url}")
+
+    async def close(self) -> None:
+        """
+        Closes the persistent AsyncClient.
+        """
+        logger.info("Closing LLM Adapter AsyncClient.")
+        await self.client.aclose()
 
     async def query_llm(
         self, 
@@ -42,23 +51,22 @@ class OpenAICompatibleLLMClient(ILLMClient):
         
         for attempt in range(retries):
             try:
-                # Setting a configurable timeout for CPU model execution (default 120s)
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    response = await client.post(self.api_url, json=payload)
-                    if response.status_code == 200:
-                        data = response.json()
-                        reply = data["choices"][0]["message"]["content"]
-                        logger.info("LLM adapter request completed successfully.")
-                        return reply
+                # Reusing the persistent client instead of creating a new one on every request
+                response = await self.client.post(self.api_url, json=payload, timeout=timeout)
+                if response.status_code == 200:
+                    data = response.json()
+                    reply = data["choices"][0]["message"]["content"]
+                    logger.info("LLM adapter request completed successfully.")
+                    return reply
+                else:
+                    logger.error(f"LLM API returned status {response.status_code}: {response.text}")
+                    # If HTTP status is not 200, we might retry or break based on severity. Let's retry for 5xx.
+                    if response.status_code >= 500 and attempt < retries - 1:
+                        sleep_time = backoff_factor ** attempt
+                        logger.info(f"Server error {response.status_code}. Retrying in {sleep_time}s...")
+                        await asyncio.sleep(sleep_time)
                     else:
-                        logger.error(f"LLM API returned status {response.status_code}: {response.text}")
-                        # If HTTP status is not 200, we might retry or break based on severity. Let's retry for 5xx.
-                        if response.status_code >= 500 and attempt < retries - 1:
-                            sleep_time = backoff_factor ** attempt
-                            logger.info(f"Server error {response.status_code}. Retrying in {sleep_time}s...")
-                            await asyncio.sleep(sleep_time)
-                        else:
-                            break
+                        break
             except (httpx.RequestError, httpx.TimeoutException) as exc:
                 logger.warning(f"LLM connection attempt {attempt + 1} failed: {exc}")
                 if attempt < retries - 1:
