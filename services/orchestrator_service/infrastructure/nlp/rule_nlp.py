@@ -13,11 +13,16 @@ class RuleNLPAdapter:
     """
     
     # Keywords for intent classification
-    SAP_KEYWORDS = [
-        "apply", "request", "submit", "book", "leave", "vacation", "sick leave", 
-        "payslip", "salary slip", "salary", "pay slip", "slip",
-        "طلب", "تقديم", "إجازة", "اجازه", "اجازة", "اجازتي", "رصيد", "مرضية", "مرضيه", "سنوية", "سنويه",
-        "راتب", "كشف راتب", "كشف الراتب", "سليب", "الراتب", "خصم"
+    SAP_ACTION_KEYWORDS = [
+        "apply", "request", "submit", "book", "order", "register", "get", "download",
+        "طلب", "تقديم", "تسجيل", "قدم", "اطلب", "سجل", "ارغب", "أريد", "اريد", "ابغى", "ابغا",
+        "خصم", "صرف", "تحويل", "تعديل", "تحديث", "احضر", "عرض", "أعطني", "اعطني", "هات", "نزّل", "نزل", "اطبع", "طباعة"
+    ]
+    
+    AMBIGUOUS_HR_NOUNS = [
+        "leave", "vacation", "sick leave", "payslip", "salary slip", "salary", "pay slip", "slip",
+        "إجازة", "اجازه", "اجازة", "اجازتي", "رصيد", "مرضية", "مرضيه", "سنوية", "سنويه",
+        "راتب", "كشف راتب", "كشف الراتب", "سليب", "الراتب", "بياناتي", "ملفي"
     ]
     
     RAG_KEYWORDS = [
@@ -29,12 +34,22 @@ class RuleNLPAdapter:
         q = query.lower()
         
         # 1. Intent Classification Heuristics
-        sap_score = 0
-        rag_score = 0
+        sap_score = 0.0
+        rag_score = 0.0
+        
+        has_sap_action = False
+        has_info_indicator = False
 
-        for kw in self.SAP_KEYWORDS:
+        # Match specific transaction actions
+        for kw in self.SAP_ACTION_KEYWORDS:
             if kw in q:
                 sap_score += 1.5 if f" {kw} " in f" {q} " else 1.0
+                has_sap_action = True
+
+        # Match ambiguous HR nouns with low weight
+        for kw in self.AMBIGUOUS_HR_NOUNS:
+            if kw in q:
+                sap_score += 0.5
 
         for kw in self.RAG_KEYWORDS:
             if kw in q:
@@ -44,15 +59,30 @@ class RuleNLPAdapter:
         has_action_prefix = False
         for pref in action_prefixes:
             if pref in q:
-                sap_score += 1.0
+                sap_score += 1.5
                 has_action_prefix = True
 
-        # Informational indicators to boost RAG intent if no action is explicitly asked
-        info_indicators = ["ما هي", "ما هو", "كيف", "شروط", "سياسة", "سياسه", "قانون", "هل", "كم", "what is", "how to", "policy"]
-        if not has_action_prefix:
-            for ind in info_indicators:
-                if ind in q:
+        # Informational indicators to boost RAG intent
+        info_indicators = [
+            "ما هي", "ما هو", "كيف", "شروط", "سياسة", "سياسه", "قانون", "هل", "كم", "what is", "how to", "policy",
+            "اعرف", "أعرف", "معرفة", "يساعد", "يساعدني", "مساعدة", "نجاح", "طريقة", "كيفية", "شرح", "توضيح", "تفاصيل", "معلومات"
+        ]
+        
+        for ind in info_indicators:
+            if ind in q:
+                has_info_indicator = True
+                # If no action prefix is present, boost RAG score
+                if not has_action_prefix:
                     rag_score += 1.5
+
+        # Ambiguity / Overlap Check:
+        is_ambiguous = False
+        # A. Contains both transactional actions AND informational words (e.g. "اريد ان اعرف ما الذي يساعدني في نجاح طلب...")
+        if (has_sap_action or has_action_prefix) and has_info_indicator:
+            is_ambiguous = True
+        # B. Generic nouns matched but no action verbs or action prefixes (e.g. "التنازل عن الاجازة السنوية بمقابل مادي")
+        elif sap_score > 0.0 and not has_sap_action and not has_action_prefix:
+            is_ambiguous = True
 
         total = sap_score + rag_score
         
@@ -64,6 +94,11 @@ class RuleNLPAdapter:
         else:
             confidence = max(sap_score, rag_score) / total
             intent = "SAP" if sap_score >= rag_score else "RAG"
+            
+            # If the rule classification is ambiguous, force low confidence to fall back to the LLM
+            if is_ambiguous:
+                logger.info(f"Ambiguity detected in query: '{query}'. Capping confidence to 0.5 to trigger LLM fallback.")
+                confidence = 0.5
 
         # 2. Entity Extraction Heuristics
         entities: Dict[str, Any] = {

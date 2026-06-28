@@ -71,6 +71,7 @@ class QdrantRetrieverAdapter(IRetriever):
             results = sorted(results, key=self._get_keyword_score_fn(query_words), reverse=True)[:limit]
 
             context_blocks = []
+            seen = set()
             for res in results:
                 # If chunk has tenant metadata, we filter manually here or via Qdrant query filter
                 chunk_tenant = res.metadata.get("tenant_id", "HSA_Group")
@@ -82,11 +83,16 @@ class QdrantRetrieverAdapter(IRetriever):
                 # For safety in multi-tenant mode, only display if it matches tenant or matches a global company policy
                 if is_tenant_match or chunk_tenant in ("HSAGroup", "HSA_Group"):
                     source = res.metadata.get("source", "Unknown Policy")
-                    page_num = res.metadata.get("page_number")
-                    if page_num:
-                        context_blocks.append(f"[مصدر: {source} (صفحة {page_num})]\n{res.document}")
-                    else:
-                        context_blocks.append(f"[مصدر: {source}]\n{res.document}")
+                    page_num = res.metadata.get("page_number", 1)
+                    text = res.document.strip()
+                    
+                    key = (source, page_num, text)
+                    if key not in seen:
+                        seen.add(key)
+                        if page_num:
+                            context_blocks.append(f"[مصدر: {source} (صفحة {page_num})]\n{res.document}")
+                        else:
+                            context_blocks.append(f"[مصدر: {source}]\n{res.document}")
                 
             return "\n\n---\n\n".join(context_blocks)
             
@@ -127,6 +133,7 @@ class QdrantRetrieverAdapter(IRetriever):
             results = sorted(results, key=self._get_keyword_score_fn(query_words), reverse=True)[:limit]
 
             citations = []
+            seen = set()
             for res in results:
                 chunk_tenant = res.metadata.get("tenant_id", "HSA_Group")
                 is_tenant_match = (
@@ -134,12 +141,19 @@ class QdrantRetrieverAdapter(IRetriever):
                     (chunk_tenant in ("HSAGroup", "HSA_Group") and tenant_id in ("HSAGroup", "HSA_Group"))
                 )
                 if is_tenant_match or chunk_tenant in ("HSAGroup", "HSA_Group"):
-                    citations.append({
-                        "source": res.metadata.get("source", "Unknown Policy"),
-                        "category": res.metadata.get("category", "General"),
-                        "page_number": res.metadata.get("page_number", 1),
-                        "text": res.document
-                    })
+                    source = res.metadata.get("source", "Unknown Policy")
+                    page_num = res.metadata.get("page_number", 1)
+                    text = res.document.strip()
+                    
+                    key = (source, page_num, text)
+                    if key not in seen:
+                        seen.add(key)
+                        citations.append({
+                            "source": source,
+                            "category": res.metadata.get("category", "General"),
+                            "page_number": page_num,
+                            "text": res.document
+                        })
                 
             return citations
             

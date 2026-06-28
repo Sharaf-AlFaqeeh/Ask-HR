@@ -1,2 +1,0 @@
-# Raw HR policy files go here (.txt or .pdf files)
-# The data_ingestion.py script will read all txt files in this folder and index them into Qdrant.
