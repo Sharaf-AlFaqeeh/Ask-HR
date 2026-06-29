@@ -18,7 +18,7 @@ class OpenAICompatibleLLMClient(ILLMClient):
         self.api_url = f"{settings.orchestrator.llm_api_url}/chat/completions"
         self.default_temp = settings.llm.temperature
         self.default_max_tokens = settings.llm.max_tokens
-        # Persistent async client for connection pooling/reuse
+        # Persistent async client for connection pooling/reuse (fail fast locally)
         self.client = httpx.AsyncClient(timeout=120.0)
         logger.info(f"Initializing LLM Adapter targeting API at: {self.api_url}")
 
@@ -45,8 +45,8 @@ class OpenAICompatibleLLMClient(ILLMClient):
             "max_tokens": max_t
         }
         
-        retries = 3
-        backoff_factor = 2.0
+        retries = 2
+        backoff_factor = 1.5
         timeout = 120.0
         
         for attempt in range(retries):
@@ -80,14 +80,18 @@ class OpenAICompatibleLLMClient(ILLMClient):
                 break
                 
         is_nlp_parser = False
+        is_rag_query = False
         for msg in messages:
-            if msg.get("role") == "system" and "expert NLP parser" in msg.get("content", ""):
-                is_nlp_parser = True
-                break
-                
-        return self._fallback_reply(messages[-1]["content"], is_nlp_parser=is_nlp_parser)
+            if msg.get("role") == "system":
+                content = msg.get("content", "")
+                if "expert NLP parser" in content:
+                    is_nlp_parser = True
+                if "السياق المسترجع" in content or "RAG" in content:
+                    is_rag_query = True
+                    
+        return self._fallback_reply(messages[-1]["content"], is_nlp_parser=is_nlp_parser, is_rag_query=is_rag_query)
 
-    def _fallback_reply(self, user_query: str, is_nlp_parser: bool = False) -> str:
+    def _fallback_reply(self, user_query: str, is_nlp_parser: bool = False, is_rag_query: bool = False) -> str:
         """
         Grounded mock reply in case the local llama-cpp service is offline.
         """
@@ -96,6 +100,14 @@ class OpenAICompatibleLLMClient(ILLMClient):
         if is_nlp_parser:
             return '{"intent": "RAG", "confidence": 0.5, "entities": {"employee_id": null, "leave_type": null, "start_date": null, "end_date": null, "month": null}}'
             
+        if is_rag_query:
+            return (
+                "⚠️ [النظام: خادم الاستدلال غير متوفر - يتم عرض المرجع مباشرة].\n"
+                "مرحباً بك! نظراً لأن خادم الذكاء الاصطناعي (LLM) غير متصل حالياً، "
+                "فقد قمنا بجلب النصوص المباشرة من السياسات واللوائح الرسمية لك.\n\n"
+                "يرجى الاطلاع على قسم **المراجع المسترجعة** أدناه لقراءة نصوص السياسة الموثقة."
+            )
+
         q = user_query.lower()
         if "إجازة" in q or "leave" in q or "vacation" in q:
             return (
@@ -116,4 +128,4 @@ class OpenAICompatibleLLMClient(ILLMClient):
                 "⚠️ [ملاحظة النظام: خادم LLM المحلي (llama-cpp-python) غير متاح حالياً].\n"
                 "مرحباً بك! لقد استقبلت طلبك بنجاح وتمت معالجته عبر المحرك البرمجي لنظام AskHR."
             )
-        
+            

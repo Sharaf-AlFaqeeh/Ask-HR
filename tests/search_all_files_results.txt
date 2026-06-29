@@ -1,0 +1,19 @@
+Searching for terms ['0١ يوم', '5553', 'ثانياً: تنظيم الإجازات'] in p:\____AI____\HSAGroup\AskHRPro...
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\logs\app.log
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\services\frontend_service\node_modules\caniuse-lite\data\regions\alt-oc.js
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\services\frontend_service\node_modules\caniuse-lite\data\regions\CZ.js
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\services\frontend_service\node_modules\caniuse-lite\data\regions\SZ.js
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\services\llm_inference_service\models\qwen2.5-1.5b-instruct-q4_k_m.gguf
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\services\llm_inference_service\models\Qwen2.5-0.5B-Instruct\tokenizer.json
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\services\llm_inference_service\models\Qwen2.5-0.5B-Instruct\vocab.json
+FOUND: 'ثانياً: تنظيم الإجازات' in file: p:\____AI____\HSAGroup\AskHRPro\services\vector_db_service\extracted_texts\HR_POLICIES_v2\سياسات الموارد البشريه\سياسة تنظيم أوقات العمل والإجازات 2026.txt
+FOUND: 'ثانياً: تنظيم الإجازات' in file: p:\____AI____\HSAGroup\AskHRPro\services\vector_db_service\extracted_texts\سياسات الموارد البشريه\سياسة تنظيم أوقات العمل والإجازات 2026_AR.txt
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\services\vector_db_service\HSA_policies\تكنولوجيا المعلومات\سياسة الاستخدام الآمن للانترنت.pdf
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\services\vector_db_service\HSA_policies\سياسات المالية\سياسة الأصول الثابتة، المنشآت والمعدات.pdf
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\services\vector_db_service\HSA_policies\سياسات المشتريات\سياسة المشتريات.pdf
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\services\vector_db_service\HSA_policies\سياسات الموارد البشريه\سياسة الخصوصية.pdf
+FOUND: 'ثانياً: تنظيم الإجازات' in file: p:\____AI____\HSAGroup\AskHRPro\services\vector_db_service\structured_texts_md\سياسات الموارد البشريه\سياسة تنظيم أوقات العمل والإجازات 2026_structured.md
+FOUND: '0١ يوم' in file: p:\____AI____\HSAGroup\AskHRPro\tests\search_all_files.py
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\tests\search_all_files.py
+FOUND: 'ثانياً: تنظيم الإجازات' in file: p:\____AI____\HSAGroup\AskHRPro\tests\search_all_files.py
+FOUND: '5553' in file: p:\____AI____\HSAGroup\AskHRPro\tests\search_app_log.py

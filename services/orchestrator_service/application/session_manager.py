@@ -99,18 +99,30 @@ class SessionManager:
             return None, params
 
         # 7. Otherwise, formulate a friendly prompt for the first missing field
+        from core.config_manager import get_settings
+        settings = get_settings()
+
+        if not settings.sap.mock_mode:
+            session.pending_action = None
+            prompt = (
+                "مرحباً 👋\n\n"
+                "حالياً لا يمكنني تنفيذ هذا الإجراء من خلال النظام.\n"
+                "لتقديم طلب إجازة أو أي إجراء آخر، يرجى التواصل مع مركز الخدمة للموارد البشرية على الرقم التالي:\n\n"
+                "📞 **123456789**\n\n"
+                "سيسعد فريق الموارد البشرية بمساعدتك! 😊"
+            )
+            return prompt, None
+
+        # If mock_mode is enabled, prompt for the next missing field to run slot-filling
         next_field = missing[0]
         field_desc = self.FIELD_NAMES_AR.get(next_field, next_field)
         
-        # Customize prompt based on action
-        # The user requested to replace slot-filling prompts with a redirect response
-        session.pending_action = None
-        prompt = (
-            "مرحباً 👋\n\n"
-            "حالياً لا يمكنني تنفيذ هذا الإجراء من خلال النظام.\n"
-            "لتقديم طلب إجازة أو أي إجراء آخر، يرجى التواصل مع مركز الخدمة للموارد البشرية على الرقم التالي:\n\n"
-            "📞 **123456789**\n\n"
-            "سيسعد فريق الموارد البشرية بمساعدتك! 😊"
-        )
-            
+        if pending.action_name == "request_leave":
+            action_desc = "تقديم طلب إجازة"
+        elif pending.action_name == "get_salary_slip":
+            action_desc = "استعلام عن كشف الراتب"
+        else:
+            action_desc = "عرض الملف الشخصي"
+
+        prompt = f"من أجل إتمام {action_desc}، يرجى تزويدي بـ {field_desc}."
         return prompt, None

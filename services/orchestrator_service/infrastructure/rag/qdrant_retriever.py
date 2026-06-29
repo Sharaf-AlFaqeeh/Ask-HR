@@ -19,9 +19,9 @@ class QdrantRetrieverAdapter(IRetriever):
         self.collection_name = settings.vector_db.collection_name
         self.qdrant_path = Path(settings.vector_db.storage_path)
         self.client = None
-        self._init_client()
+        self.init_client()
 
-    def _init_client(self) -> None:
+    def init_client(self) -> None:
         if not self.qdrant_path.exists():
             logger.warning(f"Qdrant database not found at {self.qdrant_path.absolute()}. Ingestion needed.")
             return
@@ -36,6 +36,10 @@ class QdrantRetrieverAdapter(IRetriever):
             self.client = None
 
     def retrieve_context(self, query: str, limit: int = 3) -> str:
+        if not self.client:
+            logger.info("Qdrant Client is offline. Attempting reconnection...")
+            self.init_client()
+
         if not self.client:
             logger.warning("Qdrant Client is offline. Returning empty context.")
             return ""
@@ -101,6 +105,10 @@ class QdrantRetrieverAdapter(IRetriever):
             return ""
 
     def retrieve_context_with_metadata(self, query: str, limit: int = 3) -> list:
+        if not self.client:
+            logger.info("Qdrant Client is offline. Attempting reconnection...")
+            self.init_client()
+
         if not self.client:
             logger.warning("Qdrant Client is offline. Returning empty context list.")
             return []

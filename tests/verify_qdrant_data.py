@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 
+
 # Adjust path to import core modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from core.config_manager import get_settings
@@ -24,6 +25,7 @@ def verify_qdrant():
     try:
         from qdrant_client import QdrantClient
         client = QdrantClient(path=str(qdrant_path))
+        client.set_model("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
         
         # 1. Get collection information
         collection_info = client.get_collection(collection_name=collection_name)

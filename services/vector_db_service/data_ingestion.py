@@ -1,6 +1,7 @@
 # services/vector_db_service/data_ingestion.py
 import os
 import sys
+import re
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -12,52 +13,100 @@ from core.logger import get_logger
 from core.config_manager import get_settings
 from core.exceptions import VectorDBError
 
-# تأكد من تحديث هذه الدوال في ملفات cleaner.py و chunker.py بناءً على الكود المحسن السابق
-from services.vector_db_service.preprocessing.cleaner import extract_and_clean_pdf
+# We no longer use extract_and_clean_pdf, we parse the corrected Markdown files
 from services.vector_db_service.preprocessing.chunker import chunk_document_pages
 
 logger = get_logger("vector_db_service")
 settings = get_settings()
 
+def normalize_name(name: str) -> str:
+    # Convert to lowercase
+    name = name.lower()
+    # Remove extensions and suffixes
+    name = re.sub(r'(_structured|_ar|_en|\.md|\.pdf|\.txt)', '', name)
+    # Remove spaces
+    name = re.sub(r'\s+', '', name)
+    # Normalize Arabic letters
+    name = name.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا")
+    name = name.replace("ة", "ه").replace("ى", "ي")
+    name = name.replace("ٔ", "").replace("ٕ", "").replace("ٓ", "") # diacritics
+    # Remove punctuation
+    name = re.sub(r'[^\w\s]', '', name)
+    return name
+
 def ingest_documents() -> None:
     """
-    Reads local HR policy PDFs, extracts and cleans Arabic text accurately,
+    Reads local structured MD policies, parses pages using boundary comments,
     chunks them using LangChain, and ingests into Qdrant with Multilingual Embeddings.
     """
     # 1. Setup paths
     db_service_dir = Path(__file__).parent
     hsa_policies_path = db_service_dir / "HSA_policies"
+    structured_md_path = db_service_dir / "structured_texts_md"
     qdrant_db_path = Path(settings.vector_db.storage_path)
     
-    logger.info("Initializing Data Ingestion Pipeline...")
+    logger.info("Initializing Data Ingestion Pipeline from structured Markdown...")
     
+    # Map original PDF filenames by normalized names
+    pdf_map = {}
+    if hsa_policies_path.exists():
+        logger.info(f"Mapping PDFs in {hsa_policies_path.absolute()}")
+        for pdf_path in hsa_policies_path.rglob("*.pdf"):
+            norm_name = normalize_name(pdf_path.name)
+            pdf_map[norm_name] = pdf_path.name
+    else:
+        logger.warning(f"HSA_policies directory not found at {hsa_policies_path.absolute()}")
+        
     # 2. Collect files and process chunks
     all_chunks = []
     all_metadata = []
     
-    # Process PDF files inside HSA_policies directories
-    if hsa_policies_path.exists():
-        logger.info(f"Scanning for PDF policies in {hsa_policies_path.absolute()}")
-        for pdf_path in hsa_policies_path.rglob("*.pdf"):
+    if structured_md_path.exists():
+        logger.info(f"Scanning for structured Markdown files in {structured_md_path.absolute()}")
+        for md_path in structured_md_path.rglob("*.md"):
             try:
-                category = pdf_path.parent.name
-                logger.info(f"Processing PDF document: {pdf_path.name} in category: {category}")
+                category = md_path.parent.name
+                logger.info(f"Processing structured document: {md_path.name} in category: {category}")
                 
-                # استخدام الدالة المدمجة الجديدة للاستخراج والتنظيف وإصلاح اللغة العربية
-                pages_data = extract_and_clean_pdf(pdf_path)
+                # Read Markdown content
+                with open(md_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                
+                # Find matching original PDF name
+                norm_md = normalize_name(md_path.name)
+                original_pdf_name = pdf_map.get(norm_md)
+                if not original_pdf_name:
+                    original_pdf_name = md_path.name.replace("_structured.md", ".pdf")
+                    logger.warning(f"Could not find matching PDF for {md_path.name}, falling back to {original_pdf_name}")
+                
+                # Parse pages using page boundaries comments
+                pages_data = []
+                page_matches = re.findall(r'<!-- PAGE_START (\d+) -->\s*(.*?)\s*<!-- PAGE_END \1 -->', content, re.DOTALL)
+                
+                for match in page_matches:
+                    page_num = int(match[0])
+                    page_text = match[1].strip()
+                    # Strip markdown page title if present (e.g. ## صفحة X)
+                    page_text = re.sub(r'^##\s+صفحة\s+\d+\s*\n*', '', page_text).strip()
+                    
+                    if page_text:
+                        pages_data.append({
+                            "page_number": page_num,
+                            "text": page_text
+                        })
+                
                 if not pages_data:
-                    logger.warning(f"No text extracted from PDF: {pdf_path.name}")
+                    logger.warning(f"No pages extracted from Markdown file: {md_path.name}")
                     continue
                 
-                # تقسيم النصوص باستخدام دالة LangChain الجديدة
-                # لاحظ أننا نمرر chunk_overlap الآن لضمان التداخل
+                # Chunk using LangChain chunker
                 chunks = chunk_document_pages(pages_data, chunk_size=600, chunk_overlap=100)
-                logger.info(f"Segmented {pdf_path.name} into {len(chunks)} chunks.")
+                logger.info(f"Segmented {md_path.name} into {len(chunks)} chunks.")
                 
                 for i, chunk in enumerate(chunks):
                     all_chunks.append(chunk["text"])
                     all_metadata.append({
-                        "source": pdf_path.name,
+                        "source": original_pdf_name,
                         "page_number": chunk["page_number"],
                         "category": category,
                         "tenant_id": "HSAGroup",  
@@ -65,9 +114,9 @@ def ingest_documents() -> None:
                         "language": "ar"
                     })
             except Exception as e:
-                logger.error(f"Error processing PDF file {pdf_path.name}", exc_info=True)
+                logger.error(f"Error processing MD file {md_path.name}", exc_info=True)
     else:
-        logger.warning(f"HSA_policies directory not found at {hsa_policies_path.absolute()}")
+        logger.error(f"structured_texts_md directory not found at {structured_md_path.absolute()}")
             
     if not all_chunks:
         logger.warning("No documents found to ingest. Pipeline completed with empty state.")

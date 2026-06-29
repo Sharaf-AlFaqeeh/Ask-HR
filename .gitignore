@@ -12,6 +12,12 @@ venv/
 env/
 ENV/
 
+
+# policy
+services/vector_db_service/extracted_texts/
+services/vector_db_service/HSA_policies/
+services/vector_db_service/structured_texts_md/
+
 # Pytest
 
 .pytest_cache/

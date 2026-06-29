@@ -400,7 +400,7 @@ def startup_event():
 # Main Inference Endpoint
 # ══════════════════════════════════════════════════════════════
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
-async def chat_completions(request: ChatCompletionRequest):
+def chat_completions(request: ChatCompletionRequest):
     """
     OpenAI-compatible Chat Completions endpoint.
     """

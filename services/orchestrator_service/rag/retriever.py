@@ -36,8 +36,8 @@ class RAGRetriever:
 
         try:
             from qdrant_client import QdrantClient
-            logger.info(f"Connecting RAG Retriever to Qdrant at: {self.qdrant_path.absolute()}")
             self.client = QdrantClient(path=str(self.qdrant_path))
+            self.client.set_model("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
         except Exception as e:
             logger.error("Failed to connect to local Qdrant DB", exc_info=True)
             self.client = None
@@ -46,6 +46,10 @@ class RAGRetriever:
         """
         Queries Qdrant to retrieve relevant text chunks.
         """
+        if not self.client:
+            logger.info("Qdrant Client is not initialized. Attempting auto-reconnection...")
+            self.init_qdrant_client()
+
         if not self.client:
             logger.warning("Qdrant Client is not initialized. Returning empty context.")
             return ""

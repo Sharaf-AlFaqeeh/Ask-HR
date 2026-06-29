@@ -128,7 +128,54 @@ class FlowOrchestrator:
         action_start = time.time()
         # 4. If missing details, prompt the user
         if missing_prompt:
-            response_text = missing_prompt
+            logger.info("SAP action missing fields. Retrieving RAG context to provide helpful policy info...")
+            citations = self.retriever.retrieve_context_with_metadata(query)
+            
+            if citations:
+                context_blocks = []
+                for cit in citations:
+                    source = cit["source"]
+                    page_num = cit.get("page_number")
+                    if page_num:
+                        context_blocks.append(f"[مصدر: {source} (صفحة {page_num})]\n{cit['text']}")
+                    else:
+                        context_blocks.append(f"[مصدر: {source}]\n{cit['text']}")
+                context = "\n\n---\n\n".join(context_blocks)
+                
+                system_instruction = (
+                    "أنت خبير الموارد البشرية لمجموعة هائل سعيد أنعم (HSA Group).\n"
+                    "تلقى المستخدم طلباً لمعاملة إدارية في نظام الموارد البشرية، وهناك بعض البيانات الناقصة المطلوبة لإتمامه.\n"
+                    "باستخدام معلومات السياسات المرفقة أدناه، قدم للمستخدم إجابة مفيدة تشرح فيها القواعد والشروط الخاصة بالسياسة ذات الصلة بوضوح مع الاستشهاد بذكر اسم المستند والصفحة كمرجع.\n"
+                    "ثم في نهاية ردك، اطلب من المستخدم بلطف تزويدك بالبيانات الناقصة المطلوبة لإتمام إجراء المعاملة التجريبية.\n\n"
+                    f"البيانات الناقصة المطلوب طلبها من المستخدم:\n{missing_prompt}\n\n"
+                    "سياق سياسات الموارد البشرية المسترجعة:\n"
+                    "=========================================\n"
+                    f"{context}\n"
+                    "=========================================\n"
+                )
+                
+                messages = [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": query}
+                ]
+                
+                logger.info("Invoking LLM to synthesize informative slot-filling prompt...")
+                response_text = await self.llm_client.query_llm(messages)
+                context_used = True
+            else:
+                system_instruction = (
+                    "أنت خبير الموارد البشرية لمجموعة هائل سعيد أنعم (HSA Group).\n"
+                    "تلقى المستخدم طلباً لمعاملة إدارية وهناك بيانات ناقصة.\n"
+                    "قم بصياغة طلب البيانات الناقصة التالي بأسلوب حواري مهني وودود للغاية باللغة العربية الفصحى:\n"
+                    f"{missing_prompt}"
+                )
+                messages = [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": query}
+                ]
+                response_text = await self.llm_client.query_llm(messages)
+                context_used = False
+
             session.add_message(role="assistant", content=response_text)
             self.session_store.save_session(session)
             
@@ -148,7 +195,8 @@ class FlowOrchestrator:
                 response=response_text,
                 context_used=context_used,
                 sap_executed=sap_executed,
-                session_pending=True
+                session_pending=True,
+                execution_details={"citations": citations} if citations else {}
             )
 
         # 5. If SAP Action is fully qualified, execute it!

@@ -1,6 +1,8 @@
 import os
 import sys
 import uuid
+import asyncio
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -49,12 +51,59 @@ async def add_correlation_id(request: Request, call_next):
         clear_correlation_id()
         clear_tenant_id()
 
+async def periodic_services_health_check():
+    """
+    Checks the health of the LLM Inference Service and Qdrant DB periodically
+    to ensure resilient auto-recovery.
+    """
+    await asyncio.sleep(5) # Delay initial check to let other services boot
+    
+    llm_url = settings.orchestrator.llm_api_url
+    if "/v1" in llm_url:
+        llm_url = llm_url.replace("/v1", "")
+    llm_url = f"{llm_url.rstrip('/')}/health"
+    
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        while True:
+            # 1. Check LLM Service
+            try:
+                response = await client.get(llm_url)
+                if response.status_code == 200:
+                    logger.info(f"Resilient Health Check: LLM Inference Service is ONLINE at {llm_url}")
+                else:
+                    logger.warning(f"Resilient Health Check: LLM Inference Service at {llm_url} returned code {response.status_code}")
+            except Exception as e:
+                logger.warning(f"Resilient Health Check: LLM Inference Service is OFFLINE at {llm_url}. Details: {e}")
+                
+            # 2. Check Qdrant Connection
+            try:
+                container = get_container()
+                if container.retriever.client is None:
+                    logger.info("Resilient Health Check: Qdrant Client is offline. Attempting auto-reconnection...")
+                    container.retriever.init_client()
+                else:
+                    # Test connection by listing collections (lightweight call)
+                    container.retriever.client.get_collections()
+                    logger.info("Resilient Health Check: Qdrant DB is ONLINE and connected.")
+            except Exception as e:
+                logger.warning(f"Resilient Health Check: Qdrant DB is OFFLINE or reconnection failed: {e}")
+                # Reset client to None to trigger reconnection on next cycle
+                try:
+                    container = get_container()
+                    container.retriever.client = None
+                except Exception:
+                    pass
+                
+            await asyncio.sleep(15) # Check every 15 seconds
+
 # pyrefly: ignore [deprecated]
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     # Force DI Container initialization on boot
     get_container()
     logger.info("AskHR Orchestrator service started successfully.")
+    # Start periodic services health checker in background
+    asyncio.create_task(periodic_services_health_check())
 
 # pyrefly: ignore [deprecated]
 @app.on_event("shutdown")
