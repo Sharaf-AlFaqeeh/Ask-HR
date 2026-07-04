@@ -199,9 +199,8 @@ class FlowOrchestrator:
                 execution_details={"citations": citations} if citations else {}
             )
 
-        # 5. If SAP Action is fully qualified, execute it!
+        # 5. If SAP Action is fully qualified, execute it or prompt for confirmation!
         if action_params:
-            sap_executed = True
             action_name = session.pending_action.action_name if session.pending_action else "get_profile"
             if "leave_type" in action_params and "start_date" in action_params:
                 action_name = "request_leave"
@@ -210,106 +209,148 @@ class FlowOrchestrator:
                 
             emp_id = str(action_params.get("employee_id") or "")
             
-            logger.info(f"Executing SAP Action: {action_name} for employee: {emp_id}")
+            logger.info(f"Routing SAP Action: {action_name} for employee: {emp_id}")
             
-            try:
-                if action_name == "request_leave":
-                    leave_res = self.hr_client.request_leave(
-                        employee_id=emp_id,
-                        leave_type=str(action_params.get("leave_type") or ""),
-                        start_date=str(action_params.get("start_date") or ""),
-                        end_date=str(action_params.get("end_date") or "")
+            # Lookup in registry
+            from services.orchestrator_service.actions.registry import get_action_registry
+            from services.orchestrator_service.actions.base import ActionType
+            
+            registry = get_action_registry()
+            action = registry.get(action_name)
+            
+            if action:
+                # Run validation
+                is_valid, err_msg = action.validate(action_params)
+                if not is_valid:
+                    response_text = f"⚠️ {err_msg}"
+                    session.add_message(role="assistant", content=response_text)
+                    self.session_store.save_session(session)
+                    return self._build_response_payload(
+                        query=query,
+                        intent=intent,
+                        confidence=confidence,
+                        entities=entities,
+                        response=response_text,
+                        context_used=False,
+                        sap_executed=False,
+                        session_pending=True
                     )
-                    execution_details = leave_res.model_dump()
-                    
-                    if self.settings.orchestrator.use_sap_templates:
-                        response_text = ResponseTemplates.get_leave_response(
-                            request_id=leave_res.request_id,
-                            employee_id=emp_id,
-                            leave_type=leave_res.leave_type,
-                            start_date=leave_res.start_date,
-                            end_date=leave_res.end_date,
-                            status=leave_res.status,
-                            message=leave_res.message
-                        )
-                    else:
-                        # LLM ground response building
-                        llm_instruction = PromptRegistry.SAP_REQUEST_LEAVE_USER.format(
-                            request_id=leave_res.request_id,
-                            employee_id=emp_id,
-                            leave_type=leave_res.leave_type,
-                            start_date=leave_res.start_date,
-                            end_date=leave_res.end_date,
-                            status=leave_res.status,
-                            message=leave_res.message
-                        )
-                        response_text = await self.llm_client.query_llm([
-                            {"role": "system", "content": PromptRegistry.SAP_SYSTEM},
-                            {"role": "user", "content": llm_instruction}
-                        ])
-                    
-                elif action_name == "get_salary_slip":
-                    salary_res = self.hr_client.get_salary_slip(
-                        employee_id=emp_id,
-                        month=str(action_params.get("month") or "")
+                
+                # Check action type
+                if action.action_type == ActionType.TRANSACTIONAL:
+                    # Transactional (e.g. Request Leave) requires UI confirmation card
+                    action_payload = action.get_ui_template(action_params)
+                    response_text = (
+                        f"لقد قمت بتجهيز طلب {action.name_ar} الخاص بك.\n"
+                        f"يرجى مراجعة وتأكيد البيانات المعروضة في البطاقة أدناه للموافقة على الإرسال والتنفيذ في نظام SAP."
                     )
-                    execution_details = salary_res.model_dump()
+                    # Keep pending action in session so that it remains active
+                    from services.orchestrator_service.domain.models import PendingAction
+                    if not session.pending_action:
+                        session.pending_action = PendingAction(action_name=action_name)
+                    session.pending_action.parameters = action_params
+                    session.add_message(role="assistant", content=response_text)
+                    self.session_store.save_session(session)
                     
-                    if self.settings.orchestrator.use_sap_templates:
-                        response_text = ResponseTemplates.get_salary_slip_response(
-                            employee_id=emp_id,
-                            month=salary_res.month,
-                            basic_salary=salary_res.basic_salary,
-                            housing_allowance=salary_res.housing_allowance,
-                            transport_allowance=salary_res.transport_allowance,
-                            deductions=salary_res.deductions,
-                            net_salary=salary_res.net_salary
-                        )
-                    else:
-                        llm_instruction = PromptRegistry.SAP_GET_SALARY_SLIP_USER.format(
-                            employee_id=emp_id,
-                            month=salary_res.month,
-                            basic_salary=salary_res.basic_salary,
-                            housing_allowance=salary_res.housing_allowance,
-                            transport_allowance=salary_res.transport_allowance,
-                            deductions=salary_res.deductions,
-                            net_salary=salary_res.net_salary
-                        )
-                        response_text = await self.llm_client.query_llm([
-                            {"role": "system", "content": PromptRegistry.SAP_SYSTEM},
-                            {"role": "user", "content": llm_instruction}
-                        ])
+                    return self._build_response_payload(
+                        query=query,
+                        intent=intent,
+                        confidence=confidence,
+                        entities=entities,
+                        response=response_text,
+                        context_used=False,
+                        sap_executed=False,
+                        session_pending=True,
+                        execution_details={"citations": []},
+                        action_payload=action_payload
+                    )
+                else:
+                    # Inquiry (e.g. Salary Slip) -> Execute immediately, return data + action UI loading template
+                    sap_executed = True
+                    action_payload = action.get_ui_template(action_params)
                     
-                else: # get_profile
-                    profile_res = self.hr_client.get_employee_profile(employee_id=emp_id)
-                    execution_details = profile_res.model_dump()
-                    
-                    if self.settings.orchestrator.use_sap_templates:
-                        response_text = ResponseTemplates.get_profile_response(
-                            first_name=profile_res.first_name,
-                            last_name=profile_res.last_name,
-                            department=profile_res.department,
-                            position=profile_res.position,
-                            email=profile_res.email,
-                            status=profile_res.status
+                    try:
+                        exec_res = action.execute(emp_id, action_params)
+                        execution_details = exec_res
+                        
+                        if action_name == "get_salary_slip":
+                            if self.settings.orchestrator.use_sap_templates:
+                                response_text = ResponseTemplates.get_salary_slip_response(
+                                    employee_id=emp_id,
+                                    month=exec_res.get("month", ""),
+                                    basic_salary=exec_res.get("basic_salary", 0.0),
+                                    housing_allowance=exec_res.get("housing_allowance", 0.0),
+                                    transport_allowance=exec_res.get("transport_allowance", 0.0),
+                                    deductions=exec_res.get("deductions", 0.0),
+                                    net_salary=exec_res.get("net_salary", 0.0)
+                                )
+                            else:
+                                llm_instruction = PromptRegistry.SAP_GET_SALARY_SLIP_USER.format(
+                                    employee_id=emp_id,
+                                    month=exec_res.get("month", ""),
+                                    basic_salary=exec_res.get("basic_salary", 0.0),
+                                    housing_allowance=exec_res.get("housing_allowance", 0.0),
+                                    transport_allowance=exec_res.get("transport_allowance", 0.0),
+                                    deductions=exec_res.get("deductions", 0.0),
+                                    net_salary=exec_res.get("net_salary", 0.0)
+                                )
+                                response_text = await self.llm_client.query_llm([
+                                    {"role": "system", "content": PromptRegistry.SAP_SYSTEM},
+                                    {"role": "user", "content": llm_instruction}
+                                ])
+                        else:
+                            response_text = f"تفاصيل الاستعلام الخاصة بك: {exec_res}"
+                        
+                        # Clear pending action since it's fully resolved
+                        session.pending_action = None
+                        session.add_message(role="assistant", content=response_text)
+                        self.session_store.save_session(session)
+                        
+                        return self._build_response_payload(
+                            query=query,
+                            intent=intent,
+                            confidence=confidence,
+                            entities=entities,
+                            response=response_text,
+                            context_used=False,
+                            sap_executed=True,
+                            session_pending=False,
+                            execution_details=execution_details,
+                            action_payload=action_payload
                         )
-                    else:
-                        llm_instruction = PromptRegistry.SAP_GET_PROFILE_USER.format(
-                            first_name=profile_res.first_name,
-                            last_name=profile_res.last_name,
-                            department=profile_res.department,
-                            position=profile_res.position,
-                            email=profile_res.email,
-                            status=profile_res.status
+                        
+                    except Exception as ex:
+                        logger.error(f"Error executing SAP action {action_name}: {ex}", exc_info=True)
+                        response_text = f"عذراً، فشل جلب البيانات من نظام SAP: {str(ex)}"
+                        session.pending_action = None
+                        session.add_message(role="assistant", content=response_text)
+                        self.session_store.save_session(session)
+                        return self._build_response_payload(
+                            query=query,
+                            intent=intent,
+                            confidence=confidence,
+                            entities=entities,
+                            response=response_text,
+                            context_used=False,
+                            sap_executed=False,
+                            session_pending=False
                         )
-                        response_text = await self.llm_client.query_llm([
-                            {"role": "system", "content": PromptRegistry.SAP_SYSTEM},
-                            {"role": "user", "content": llm_instruction}
-                        ])
-            except Exception as ex:
-                logger.error(f"Error executing SAP action: {str(ex)}", exc_info=True)
-                response_text = f"عذراً، حدث خطأ أثناء تنفيذ الإجراء في نظام SAP SuccessFactors: {str(ex)}"
-                execution_details = {"error": str(ex)}
+            else:
+                # Fallback if action is not in registry
+                response_text = f"عذراً، الإجراء {action_name} غير مدعوم في النظام حالياً."
+                session.pending_action = None
+                session.add_message(role="assistant", content=response_text)
+                self.session_store.save_session(session)
+                return self._build_response_payload(
+                    query=query,
+                    intent=intent,
+                    confidence=confidence,
+                    entities=entities,
+                    response=response_text,
+                    context_used=False,
+                    sap_executed=False,
+                    session_pending=False
+                )
 
         # 6. RAG Pipeline execution (General Policies)
         else:
@@ -383,7 +424,8 @@ class FlowOrchestrator:
         context_used: bool,
         sap_executed: bool,
         session_pending: bool,
-        execution_details: Optional[Dict[str, Any]] = None
+        execution_details: Optional[Dict[str, Any]] = None,
+        action_payload: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         return {
             "query": query,
@@ -394,5 +436,6 @@ class FlowOrchestrator:
             "context_used": context_used,
             "sap_executed": sap_executed,
             "session_pending": session_pending,
-            "execution_details": execution_details or {}
+            "execution_details": execution_details or {},
+            "action_payload": action_payload
         }

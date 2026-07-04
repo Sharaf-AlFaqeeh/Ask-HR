@@ -6,6 +6,10 @@ export default function Sidebar() {
   const activeView = useAppStore((state) => state.activeView);
   const switchView = useAppStore((state) => state.switchView);
   const startNewSession = useChatStore((state) => state.startNewSession);
+  const sessions = useChatStore((state) => state.sessions);
+  const sessionId = useChatStore((state) => state.sessionId);
+  const loadSession = useChatStore((state) => state.loadSession);
+  const clearSessionById = useChatStore((state) => state.clearSessionById);
 
   return (
     <aside className="sidebar">
@@ -64,7 +68,58 @@ export default function Sidebar() {
         </li>
       </ul>
 
-      <div className="upgrade-card">
+      {/* Persistent Chat Sessions History Manager */}
+      <div className="sidebar-sessions-title">محادثاتك السابقة</div>
+      <div style={{ padding: '0 1rem', marginBottom: '0.5rem' }}>
+        <button 
+          className="new-chat-btn" 
+          onClick={startNewSession}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem', borderRadius: '8px', border: '1px dashed var(--border-color)', backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+        >
+          <i className="fa-solid fa-plus"></i>
+          محادثة جديدة
+        </button>
+      </div>
+
+      <div className="sidebar-session-list">
+        {sessions.length === 0 ? (
+          <div style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)', padding: '1rem 0' }}>
+            لا توجد محادثات سابقة.
+          </div>
+        ) : (
+          sessions.map((s) => (
+            <div 
+              key={s.session_id} 
+              className={`sidebar-session-item ${sessionId === s.session_id ? 'active' : ''}`}
+              onClick={() => {
+                if (sessionId !== s.session_id) {
+                  loadSession(s.session_id);
+                  switchView('assistant');
+                }
+              }}
+            >
+              <div className="session-item-content">
+                <i className="fa-regular fa-comment"></i>
+                <span className="session-item-preview" title={s.preview}>{s.preview}</span>
+              </div>
+              <button 
+                className="session-delete-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm('هل أنت متأكد من حذف هذه المحادثة؟')) {
+                    clearSessionById(s.session_id);
+                  }
+                }}
+                title="حذف المحادثة"
+              >
+                <i className="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="upgrade-card" style={{ marginTop: 'auto' }}>
         <button className="upgrade-btn">Active Mode</button>
       </div>
 
@@ -73,7 +128,17 @@ export default function Sidebar() {
           <i className="fa-solid fa-circle-question"></i>
           <span>مركز المساعدة</span>
         </div>
-        <div className="footer-link" onClick={startNewSession}>
+        <div 
+          className="footer-link" 
+          onClick={() => {
+            if (confirm('هل أنت متأكد من تسجيل الخروج؟')) {
+              localStorage.removeItem('authToken');
+              localStorage.removeItem('userProfile');
+              useAppStore.setState({ authToken: null, loggedInUser: null });
+              useChatStore.getState().startNewSession();
+            }
+          }}
+        >
           <i className="fa-solid fa-arrow-right-from-bracket"></i>
           <span>تسجيل الخروج</span>
         </div>

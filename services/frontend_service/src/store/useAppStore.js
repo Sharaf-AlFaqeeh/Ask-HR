@@ -7,7 +7,8 @@ export const baseUrl = window.location.hostname === 'localhost' || window.locati
 export const useAppStore = create((set, get) => ({
   theme: localStorage.getItem('theme') || 'dark',
   activeView: 'assistant',
-  authToken: 'askhr_super_secret_token_2026',
+  authToken: localStorage.getItem('authToken') || null,
+  loggedInUser: JSON.parse(localStorage.getItem('userProfile')) || null,
   serverStatus: 'checking',
   serverStatusText: 'جاري الفحص...',
   consoleLogs: [

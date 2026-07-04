@@ -3,7 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useChatStore } from '../store/useChatStore';
 
 export default function Header() {
-  const { activeView, switchView, theme, toggleTheme, serverStatus, serverStatusText, checkServerHealth } = useAppStore();
+  const { activeView, switchView, theme, toggleTheme, serverStatus, serverStatusText, checkServerHealth, loggedInUser } = useAppStore();
   const triggerIngest = useChatStore((state) => state.triggerIngest);
   const isIngesting = useChatStore((state) => state.isIngesting);
 
@@ -96,7 +96,24 @@ export default function Header() {
           <span id="server-status-text">{serverStatusText}</span>
         </div>
 
-        <div className="user-cell-avatar" style={{ cursor: 'pointer' }} onClick={() => switchView('settings')}>HR</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div className="user-info-text" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', fontSize: '0.75rem', lineStyle: 'none' }}>
+            <span style={{ fontWeight: 700, color: '#fff' }}>
+              {loggedInUser ? `${loggedInUser.first_name} ${loggedInUser.last_name}` : 'زائر'}
+            </span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.68rem', direction: 'rtl' }}>
+              {loggedInUser ? loggedInUser.department : 'شير بونت SSO'}
+            </span>
+          </div>
+          <div 
+            className="user-cell-avatar" 
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }} 
+            onClick={() => switchView('settings')}
+            title={loggedInUser ? `الموظف: ${loggedInUser.first_name}` : 'المستخدم'}
+          >
+            {loggedInUser ? `${loggedInUser.first_name[0]}${loggedInUser.last_name[0]}`.toUpperCase() : 'HR'}
+          </div>
+        </div>
       </div>
     </header>
   );

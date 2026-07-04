@@ -1,7 +1,7 @@
 from services.orchestrator_service.infrastructure.llm_clients.openai_client import OpenAICompatibleLLMClient
 from services.orchestrator_service.infrastructure.rag.qdrant_retriever import QdrantRetrieverAdapter
 from services.orchestrator_service.infrastructure.hr_systems.sap_client import SAPSuccessFactorsAdapter
-from services.orchestrator_service.infrastructure.storage.in_memory import InMemorySessionStore
+from services.orchestrator_service.infrastructure.storage.sqlite_store import SQLiteSessionStore
 from services.orchestrator_service.infrastructure.nlp.hybrid_nlp import HybridNLPPipeline
 from services.orchestrator_service.application.flow_orchestrator import FlowOrchestrator
 from core.logger import get_logger
@@ -31,7 +31,7 @@ class DIContainer:
         self.llm_client = OpenAICompatibleLLMClient()
         self.retriever = QdrantRetrieverAdapter()
         self.hr_client = SAPSuccessFactorsAdapter()
-        self.session_store = InMemorySessionStore()
+        self.session_store = SQLiteSessionStore()
         
         # 2. Instantiate NLP Pipeline (passing LLM Client for semantic fallback)
         self.nlp_pipeline = HybridNLPPipeline(self.llm_client)

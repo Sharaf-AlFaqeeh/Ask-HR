@@ -119,3 +119,19 @@ def require_scope(required_scope: str):
             )
         return principal
     return dependency
+
+def create_access_token(data: Dict[str, Any]) -> str:
+    """
+    Creates a signed JWT access token.
+    """
+    import jwt
+    import time
+    payload = data.copy()
+    # Expire in 24 hours
+    payload["exp"] = time.time() + 86400
+    token = jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+    # In some older pyjwt versions, encode returns bytes instead of str
+    if isinstance(token, bytes):
+        return token.decode("utf-8")
+    return token
+
