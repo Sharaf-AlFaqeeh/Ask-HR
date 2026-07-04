@@ -129,40 +129,14 @@ export default function AssistantView() {
                     )}
                   </div>
 
-                  {msg.sender === 'bot' && msg.responseData && (
-                    <div className="engine-pills">
-                      {msg.responseData.intent && (
-                        <div className="engine-pill intent">
-                          <i className="fa-solid fa-bullseye"></i>
-                          {msg.responseData.intent}
-                        </div>
-                      )}
-                      {msg.responseData.context_used && (
-                        <div className="engine-pill rag">
-                          <i className="fa-solid fa-database"></i>
-                          RAG
-                        </div>
-                      )}
-                      {msg.responseData.sap_executed && (
-                        <div className="engine-pill sap">
-                          <i className="fa-solid fa-check-double"></i>
-                          SAP SuccessFactors
-                        </div>
-                      )}
-                      {msg.responseData.confidence != null && (
-                        <div className="engine-pill confidence">
-                          <i className="fa-solid fa-gauge-high"></i>
-                          {Math.round(msg.responseData.confidence * 100)}%
-                        </div>
-                      )}
-                    </div>
-                  )}
+
 
                   <div className="message-meta">
                     <span>{msg.time}</span>
                   </div>
                 </div>
 
+             
               </div>
 
             ))
@@ -171,7 +145,8 @@ export default function AssistantView() {
           {isWaitingResponse && (
             <div className="message-wrapper bot">
               <div className="message-bubble">
-                <div className="typing-indicator">
+                <div className="typing-indicator">يفكر
+                {/* <div className="typing-indicator">جارٍ التفكير */}
                   <div className="typing-dot"></div>
                   <div className="typing-dot"></div>
                   <div className="typing-dot"></div>

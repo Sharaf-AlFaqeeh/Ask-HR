@@ -1073,25 +1073,37 @@ body[dir="ltr"] .activity-table {
     flex-direction: column;
     height: 100%;
     position: relative;
+    background: transparent;
 }
 
 .chat-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 2rem 15%;
+    padding: 2rem 12%;
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1.25rem;
     scroll-behavior: smooth;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 2%, black 96%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 2%, black 96%, transparent 100%);
 }
 
 /* --- MESSAGE WRAPPERS --- */
 .message-wrapper {
     display: flex;
     gap: 0.85rem;
-    max-width: 70%;
+    max-width: 72%;
     opacity: 0;
-    animation: messageFadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: messageFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: transform 0.25s ease;
+}
+
+.message-wrapper:hover {
+    transform: translateX(-2px);
+}
+
+.message-wrapper.user:hover {
+    transform: translateX(2px);
 }
 
 .message-wrapper.user {
@@ -1104,8 +1116,8 @@ body[dir="ltr"] .activity-table {
 }
 
 @keyframes messageFadeIn {
-    from { opacity: 0; transform: translateY(16px) scale(0.98); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: translateY(12px) scale(0.97); filter: blur(2px); }
+    to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
 /* --- AVATARS --- */
@@ -1141,38 +1153,57 @@ body[dir="ltr"] .activity-table {
 .message-bubble-container {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.35rem;
 }
 
 .message-bubble {
-    padding: 1rem 1.35rem;
-    border-radius: 20px;
-    line-height: 1.75;
+    padding: 0.9rem 1.3rem;
+    border-radius: 22px;
+    line-height: 1.8;
     font-size: 0.93rem;
     position: relative;
-    transition: var(--transition-smooth);
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* User bubble — organic rounded shape */
 .message-wrapper.user .message-bubble {
-    background: linear-gradient(135deg, var(--hsa-blue), #003b80);
+    background: linear-gradient(145deg, var(--hsa-blue), #003d85, #002a5c);
     color: #fff;
-    border-top-right-radius: 6px;
-    box-shadow: 0 4px 20px rgba(0, 86, 179, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    border-radius: 22px 6px 22px 22px;
+    box-shadow:
+        0 2px 8px rgba(0, 86, 179, 0.12),
+        0 8px 24px rgba(0, 86, 179, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+.message-wrapper.user:hover .message-bubble {
+    box-shadow:
+        0 4px 12px rgba(0, 86, 179, 0.18),
+        0 12px 32px rgba(0, 86, 179, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Bot bubble — airy glass-like feel */
 .message-wrapper.bot .message-bubble {
-    background: rgba(255, 255, 255, 0.025);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(212, 175, 55, 0.12);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+    backdrop-filter: blur(12px) saturate(1.2);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-right: 1px solid rgba(212, 175, 55, 0.12);
     color: var(--text-primary);
-    border-top-left-radius: 6px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    border-radius: 6px 22px 22px 22px;
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.08),
+        0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
 .message-wrapper.bot:hover .message-bubble {
-    border-color: rgba(212, 175, 55, 0.25);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02));
+    border-color: rgba(255, 255, 255, 0.1);
+    border-right-color: rgba(212, 175, 55, 0.22);
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.1),
+        0 8px 28px rgba(0, 0, 0, 0.08);
 }
 
 /* --- MESSAGE META --- */
@@ -1249,51 +1280,63 @@ body[dir="ltr"] .activity-table {
 /* --- TYPING INDICATOR --- */
 .typing-indicator {
     display: flex;
-    gap: 6px;
+    gap: 7px;
     align-items: center;
     height: 24px;
     padding: 0 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.82rem;
 }
 
 .typing-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     background: linear-gradient(135deg, var(--hsa-gold), var(--hsa-gold-dark));
     border-radius: 50%;
-    animation: typingBounce 1.4s infinite ease-in-out both;
+    animation: typingBounce 1.6s infinite ease-in-out both;
 }
 
-.typing-dot:nth-child(1) { animation-delay: -0.32s; }
-.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+.typing-dot:nth-child(1) { animation-delay: -0.4s; }
+.typing-dot:nth-child(2) { animation-delay: -0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0s; }
 
 @keyframes typingBounce {
-    0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; }
-    40% { transform: scale(1); opacity: 1; }
+    0%, 100% { transform: scale(0.5) translateY(0); opacity: 0.3; }
+    30% { transform: scale(1) translateY(-4px); opacity: 1; }
+    60% { transform: scale(0.7) translateY(1px); opacity: 0.6; }
 }
 
 /* --- INPUT PANEL --- */
 .chat-input-panel {
-    padding: 1rem 1.25rem 0.75rem;
+    padding: 0.85rem 12% 0.7rem;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    border-top: 1px solid var(--border-color);
+    border-top: none;
+    background: linear-gradient(to top, var(--bg-secondary) 60%, transparent 100%);
+    position: relative;
 }
 
 .chat-input-wrapper {
     display: flex;
     gap: 0.75rem;
     align-items: center;
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    padding: 0.35rem 0.35rem 0.35rem 1.1rem;
-    transition: var(--transition-smooth);
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 28px;
+    padding: 0.35rem 0.4rem 0.35rem 1.2rem;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .chat-input-wrapper:focus-within {
-    border-color: var(--hsa-gold);
-    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.08), 0 4px 20px rgba(0, 0, 0, 0.15);
+    border-color: rgba(212, 175, 55, 0.35);
+    background: rgba(0, 0, 0, 0.22);
+    box-shadow:
+        0 0 0 3px rgba(212, 175, 55, 0.06),
+        0 4px 24px rgba(0, 0, 0, 0.12);
+    transform: translateY(-1px);
 }
 
 .chat-input {
@@ -2202,85 +2245,109 @@ body.light-theme .theme-toggle-pill {
 
 /* --- THINKING PROCESS CITATIONS --- */
 .thinking-process-container {
-    margin-top: 0.75rem;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    background: rgba(255, 255, 255, 0.015);
-    border-radius: 12px;
+    margin-top: 0.65rem;
+    border: none;
+    background: transparent;
+    border-radius: 14px;
     overflow: hidden;
-    transition: all 0.3s ease;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .thinking-process-toggle {
     width: 100%;
-    background: transparent;
-    border: none;
-    padding: 0.6rem 1rem;
+    background: rgba(129, 140, 248, 0.06);
+    border: 1px solid rgba(129, 140, 248, 0.1);
+    border-radius: 12px;
+    padding: 0.55rem 1rem;
     color: #818cf8;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
     text-align: right;
-    transition: background 0.2s ease;
+    transition: all 0.25s ease;
 }
 
 .thinking-process-toggle:hover {
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(129, 140, 248, 0.1);
+    border-color: rgba(129, 140, 248, 0.2);
     color: #a5b4fc;
+    transform: translateY(-1px);
 }
 
 .thinking-process-content {
-    padding: 0.75rem 1rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 0.6rem 0;
+    border-top: none;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    background: rgba(0, 0, 0, 0.1);
+    gap: 0.5rem;
+    background: transparent;
+    margin-top: 0.5rem;
+    animation: citationsSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes citationsSlideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .citation-block {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.35rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    padding: 0.65rem 0.85rem;
+    transition: all 0.25s ease;
+}
+
+.citation-block:hover {
+    background: rgba(255, 255, 255, 0.035);
+    border-color: rgba(129, 140, 248, 0.12);
+    transform: translateY(-1px);
 }
 
 .citation-text {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     color: var(--text-secondary);
-    line-height: 1.6;
+    line-height: 1.65;
     font-style: italic;
-    background: rgba(255, 255, 255, 0.02);
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
-    border-right: 3px solid rgba(129, 140, 248, 0.5);
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    border-right: 2px solid rgba(129, 140, 248, 0.35);
+    padding-right: 0.65rem;
 }
 
 .citation-meta {
     display: flex;
     justify-content: flex-end;
+    margin-top: 0.15rem;
 }
 
 .citation-link {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    background: rgba(212, 175, 55, 0.08);
-    border: 1px solid rgba(212, 175, 55, 0.2);
+    background: rgba(212, 175, 55, 0.06);
+    border: 1px solid rgba(212, 175, 55, 0.15);
     color: var(--hsa-gold);
-    padding: 0.25rem 0.6rem;
+    padding: 0.2rem 0.55rem;
     border-radius: 20px;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     font-weight: 500;
     text-decoration: none;
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .citation-link:hover {
-    background: rgba(212, 175, 55, 0.15);
-    border-color: rgba(212, 175, 55, 0.4);
+    background: rgba(212, 175, 55, 0.12);
+    border-color: rgba(212, 175, 55, 0.35);
     transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(212, 175, 55, 0.1);
 }
 
 /* Light Theme overrides */

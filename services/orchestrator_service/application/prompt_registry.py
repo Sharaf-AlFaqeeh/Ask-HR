@@ -1,3 +1,4 @@
+# services\orchestrator_service\application\prompt_registry.py
 class PromptRegistry:
     """
     Centralized registry for all LLM prompts used across the AskHR service.
