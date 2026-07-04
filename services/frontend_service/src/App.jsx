@@ -11,6 +11,7 @@ import { useChatStore } from './store/useChatStore';
 export default function App() {
   const activeView = useAppStore((state) => state.activeView);
   const theme = useAppStore((state) => state.theme);
+  const sidebarCollapsed = useAppStore((state) => state.sidebarCollapsed);
   const authToken = useAppStore((state) => state.authToken);
   const fetchSessions = useChatStore((state) => state.fetchSessions);
 
@@ -49,7 +50,7 @@ export default function App() {
         <div className="ambient-glow-2"></div>
       </div>
 
-      <div className="app-layout">
+      <div className={`app-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <Sidebar />
 
         <div className="main-content">

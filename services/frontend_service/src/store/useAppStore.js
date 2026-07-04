@@ -7,6 +7,7 @@ export const baseUrl = window.location.hostname === 'localhost' || window.locati
 export const useAppStore = create((set, get) => ({
   theme: localStorage.getItem('theme') || 'dark',
   activeView: 'assistant',
+  sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
   authToken: localStorage.getItem('authToken') || null,
   loggedInUser: JSON.parse(localStorage.getItem('userProfile')) || null,
   serverStatus: 'checking',
@@ -27,6 +28,13 @@ export const useAppStore = create((set, get) => ({
   setAuthToken: (token) => {
     set({ authToken: token });
     get().addConsoleLog('تم تحديث مفتاح الوصول Authentication Token', 'info');
+  },
+
+  toggleSidebar: () => {
+    const collapsed = !get().sidebarCollapsed;
+    localStorage.setItem('sidebarCollapsed', String(collapsed));
+    set({ sidebarCollapsed: collapsed });
+    get().addConsoleLog(collapsed ? 'تم إخفاء القائمة الجانبية.' : 'تم إظهار القائمة الجانبية.', 'info');
   },
 
   switchView: (viewName) => {

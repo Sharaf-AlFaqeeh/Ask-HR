@@ -3,7 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useChatStore } from '../store/useChatStore';
 
 export default function Header() {
-  const { activeView, switchView, theme, toggleTheme, serverStatus, serverStatusText, checkServerHealth, loggedInUser } = useAppStore();
+  const { activeView, switchView, theme, toggleTheme, serverStatus, serverStatusText, checkServerHealth, loggedInUser, sidebarCollapsed, toggleSidebar } = useAppStore();
   const triggerIngest = useChatStore((state) => state.triggerIngest);
   const isIngesting = useChatStore((state) => state.isIngesting);
 
@@ -18,6 +18,16 @@ export default function Header() {
 
   return (
     <header className="top-header">
+      {sidebarCollapsed && (
+        <button 
+          className="header-sidebar-toggle" 
+          onClick={toggleSidebar}
+          title="عرض القائمة الجانبية"
+        >
+          <i className="fa-solid fa-bars"></i>
+        </button>
+      )}
+
       <div className="logo-area">
         <div className="logo-wrapper">
           <span className="header-brand">AskHR</span>
