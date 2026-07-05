@@ -165,7 +165,7 @@ def extract_procurement_easyocr(pdf_path):
             tables = plumber_page.find_tables()
             
             if tables:
-                page_ar_text += "[الجداول المكتشفة]:\n"
+                page_ar_text += "\n"
                 page_en_text += "[Discovered Tables]:\n"
                 
                 img_masked = img.copy()
