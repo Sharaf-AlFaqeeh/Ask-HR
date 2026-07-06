@@ -2994,5 +2994,28 @@ body.light-theme .citation-link:hover {
     background: rgba(255, 255, 255, 0.03);
 }
 
+/* Typing cursor animation */
+.cursor-blink {
+    display: inline-block;
+    width: 2px;
+    height: 1.1em;
+    background-color: var(--hsa-gold);
+    margin-left: 2px;
+    vertical-align: middle;
+    animation: cursor-blink-keyframes 0.8s infinite;
+}
+
+@keyframes cursor-blink-keyframes {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+}
+
+.action-icon-btn {
+    transition: all 0.2s ease;
+}
+.action-icon-btn:hover {
+    color: #fff !important;
+}
+
 
 

@@ -1,7 +1,7 @@
 # services/orchestrator_service/infrastructure/llm_clients/openai_client.py
 import httpx
 import asyncio
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, AsyncGenerator
 from services.orchestrator_service.domain.interfaces import ILLMClient
 from core.config_manager import get_settings
 from core.logger import get_logger
@@ -88,8 +88,102 @@ class OpenAICompatibleLLMClient(ILLMClient):
                     is_nlp_parser = True
                 if "السياق المسترجع" in content or "RAG" in content:
                     is_rag_query = True
-                    
         return self._fallback_reply(messages[-1]["content"], is_nlp_parser=is_nlp_parser, is_rag_query=is_rag_query)
+
+    async def query_llm_stream(
+        self, 
+        messages: List[Dict[str, str]], 
+        temperature: Optional[float] = None, 
+        max_tokens: Optional[int] = None
+    ) -> AsyncGenerator[str, None]:
+        import json
+        import re
+        temp = temperature if temperature is not None else self.default_temp
+        max_t = max_tokens if max_tokens is not None else self.default_max_tokens
+        
+        payload = {
+            "model": "qwen2.5-7b",
+            "messages": messages,
+            "temperature": temp,
+            "max_tokens": max_t,
+            "stream": True
+        }
+        
+        retries = 2
+        backoff_factor = 1.5
+        timeout = 120.0
+        
+        for attempt in range(retries):
+            try:
+                # Reusing the persistent client stream context manager
+                async with self.client.stream("POST", self.api_url, json=payload, timeout=timeout) as response:
+                    if response.status_code == 200:
+                        async for line in response.aiter_lines():
+                            line = line.strip()
+                            if not line:
+                                continue
+                            if line.startswith("data: "):
+                                data_str = line[6:].strip()
+                                if data_str == "[DONE]":
+                                    break
+                                try:
+                                    chunk_data = json.loads(data_str)
+                                    delta = chunk_data["choices"][0]["delta"]
+                                    if "content" in delta:
+                                        yield delta["content"]
+                                except Exception as parse_err:
+                                    logger.error(f"Error parsing SSE chunk: {parse_err}")
+                            else:
+                                # Handle cases where LLM server ignores stream=True and returns standard JSON
+                                try:
+                                    non_stream_data = json.loads(line)
+                                    if "choices" in non_stream_data:
+                                        message_content = non_stream_data["choices"][0]["message"]["content"]
+                                        yield message_content
+                                        logger.info("LLM adapter non-streaming standard payload captured in stream reader.")
+                                        return
+                                except Exception:
+                                    pass
+                        logger.info("LLM adapter streaming completed successfully.")
+                        return
+                    else:
+                        logger.error(f"LLM API returned status {response.status_code}: {response.text}")
+                        if response.status_code >= 500 and attempt < retries - 1:
+                            sleep_time = backoff_factor ** attempt
+                            logger.info(f"Server error {response.status_code}. Retrying stream in {sleep_time}s...")
+                            await asyncio.sleep(sleep_time)
+                        else:
+                            break
+            except (httpx.RequestError, httpx.TimeoutException) as exc:
+                logger.warning(f"LLM streaming connection attempt {attempt + 1} failed: {exc}")
+                if attempt < retries - 1:
+                    sleep_time = backoff_factor ** attempt
+                    logger.info(f"Retrying query_llm_stream in {sleep_time} seconds...")
+                    await asyncio.sleep(sleep_time)
+                else:
+                    logger.error(f"LLM adapter connections all timed out or failed for stream after {retries} attempts.")
+            except Exception as exc:
+                logger.error(f"Unexpected error during LLM Adapter streaming execution: {exc}")
+                break
+                
+        is_nlp_parser = False
+        is_rag_query = False
+        for msg in messages:
+            if msg.get("role") == "system":
+                content = msg.get("content", "")
+                if "expert NLP parser" in content:
+                    is_nlp_parser = True
+                if "السياق المسترجع" in content or "RAG" in content:
+                    is_rag_query = True
+                    
+        fallback_text = self._fallback_reply(messages[-1]["content"], is_nlp_parser=is_nlp_parser, is_rag_query=is_rag_query)
+        
+        # Split into words & spaces to simulate smooth active streaming
+        words = re.split(r'(\s+)', fallback_text)
+        for word in words:
+            if word:
+                yield word
+                await asyncio.sleep(0.015)
 
     def _fallback_reply(self, user_query: str, is_nlp_parser: bool = False, is_rag_query: bool = False) -> str:
         """

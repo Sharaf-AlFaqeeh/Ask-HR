@@ -49,10 +49,298 @@ function InquiryLoadingCard({ steps, onComplete }) {
   );
 }
 
+function BotMessageBubble({ msg, index, activePendingAction, executePendingAction, sendQuery }) {
+  const [displayedText, setDisplayedText] = useState('');
+  const [thinkingText, setThinkingText] = useState('');
+  const [isThinkingDone, setIsThinkingDone] = useState(false);
+  const [isThinkingExpanded, setIsThinkingExpanded] = useState(true); // default expanded while thinking
+  const [isTypingCompleted, setIsTypingCompleted] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [inquiryCompleted, setInquiryCompleted] = useState(false);
+
+  const isHistory = !msg.rawTextBuffer && !msg.rawTextTarget && msg.text;
+
+  // Sync state values with a ref to avoid stale closure scopes in the setInterval callback
+  const stateRef = useRef({
+    isHistory,
+    isThinkingDone: isHistory,
+    thinkingText: '',
+    displayedText: isHistory ? msg.text : '',
+    rawTextBuffer: msg.rawTextBuffer || '',
+    rawTextTarget: msg.rawTextTarget || '',
+    isStreamClosed: msg.isStreamClosed || isHistory,
+    citations: msg.citations || [],
+  });
+
+  useEffect(() => {
+    stateRef.current.rawTextBuffer = msg.rawTextBuffer || '';
+    stateRef.current.rawTextTarget = msg.rawTextTarget || '';
+    stateRef.current.isStreamClosed = msg.isStreamClosed || isHistory;
+    stateRef.current.citations = msg.citations || [];
+  }, [msg.rawTextBuffer, msg.rawTextTarget, msg.isStreamClosed, msg.citations, isHistory]);
+
+  // Unified interval for sequential thinking -> response character-by-character typing
+  useEffect(() => {
+    if (isHistory) {
+      setDisplayedText(msg.text);
+      setIsThinkingDone(true);
+      setIsThinkingExpanded(false);
+      setIsTypingCompleted(true);
+      return;
+    }
+
+    let thinkingCharIdx = 0;
+    let responseCharIdx = 0;
+    let targetThinkingText = '';
+    let hasInitializedThinkingText = false;
+
+    const interval = setInterval(() => {
+      const state = stateRef.current;
+
+      // Phase 1: Thinking typing animation
+      if (!state.isThinkingDone) {
+        if (state.citations.length === 0) {
+          state.isThinkingDone = true;
+          setIsThinkingDone(true);
+          return;
+        }
+
+        if (!hasInitializedThinkingText) {
+          const docSources = Array.from(new Set(state.citations.map(c => c.source)));
+          targetThinkingText = `جاري مراجعة وتحليل لوائح السياسات المسترجعة من مستند [${docSources.join(', ')}]...`;
+          hasInitializedThinkingText = true;
+        }
+
+        if (thinkingCharIdx < targetThinkingText.length) {
+          const nextText = targetThinkingText.substring(0, thinkingCharIdx + 1);
+          setThinkingText(nextText);
+          state.thinkingText = nextText;
+          thinkingCharIdx++;
+        } else {
+          state.isThinkingDone = true;
+          setIsThinkingDone(true);
+        }
+        return;
+      }
+
+      // Phase 2: Response text typing animation
+      const targetResponseText = state.isStreamClosed ? state.rawTextTarget || state.rawTextBuffer : state.rawTextBuffer;
+
+      if (responseCharIdx < targetResponseText.length) {
+        const nextText = targetResponseText.substring(0, responseCharIdx + 1);
+        setDisplayedText(nextText);
+        state.displayedText = nextText;
+        responseCharIdx++;
+      } else if (state.isStreamClosed) {
+        clearInterval(interval);
+        setIsTypingCompleted(true);
+        setIsThinkingExpanded(false); // Auto collapse thinking on completion
+      }
+    }, 12);
+
+    return () => clearInterval(interval);
+  }, [isHistory, msg.text]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(msg.rawTextTarget || msg.text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const hasWidget = msg.actionWidget !== undefined && msg.actionWidget !== null;
+  const isTransaction = hasWidget && msg.actionWidget.action_type === 'TRANSACTIONAL';
+  const isInquiry = hasWidget && msg.actionWidget.action_type === 'INQUIRY';
+  
+  const inquiryShowText = !isInquiry || inquiryCompleted;
+
+  return (
+    <div className="message-bubble">
+      {/* Inquiry Animation Handling */}
+      {isInquiry && !inquiryCompleted && (
+        <InquiryLoadingCard 
+          steps={msg.actionWidget.status_steps_ar || []} 
+          onComplete={() => setInquiryCompleted(true)}
+        />
+      )}
+
+      {/* 🧠 Thinking Block */}
+      {inquiryShowText && msg.citations && msg.citations.length > 0 && (
+        <div className="thinking-process-container animate-fade-in" style={{ marginBottom: '0.6rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', direction: 'rtl', justifyContent: 'flex-start' }}>
+            <button
+              onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: 'none',
+                width: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'var(--hsa-gold)',
+                outline: 'none',
+                transition: 'all 0.2s ease',
+                padding: 0
+              }}
+              className="action-icon-btn"
+              title={isThinkingExpanded ? "إخفاء مراجع السياسات" : "عرض مراجع السياسات والتفكير"}
+            >
+              <i className={`fa-solid ${isThinkingExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`} style={{ fontSize: '0.75rem' }} />
+            </button>
+
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+              {!isThinkingDone ? '⚙️ جاري مراجعة وتحليل لوائح السياسات...' : '🧠 مراجع السياسات المسترجعة'}
+            </span>
+          </div>
+
+          {isThinkingExpanded && (
+            <div className="thinking-process-content" style={{ marginTop: '0.4rem', padding: '0.6rem 0.8rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.12)', border: '1px solid rgba(255,255,255,0.03)' }}>
+              {/* Simulated typing status */}
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', opacity: 0.9, fontStyle: 'italic', marginBottom: '0.5rem', direction: 'rtl', textAlign: 'right' }}>
+                {thinkingText}
+                {!isThinkingDone && <span className="cursor-blink"></span>}
+              </div>
+
+              {/* Citations references */}
+              {isThinkingDone && msg.citations.map((cit, cIdx) => (
+                <div key={cIdx} className="citation-block" style={{ padding: '0.5rem 0', borderBottom: cIdx < msg.citations.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                  <div className="citation-text" style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '0.25rem', direction: 'rtl', textAlign: 'right' }}>
+                    "{cit.text}"
+                  </div>
+                  <div className="citation-meta" style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                    <a
+                      href={`http://127.0.0.1:8081/policies-files/${cit.category}/${cit.source}#page=${cit.page_number}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="citation-link"
+                      style={{ fontSize: '0.75rem', color: 'var(--hsa-gold)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <i className="fa-solid fa-file-pdf"></i>
+                      <span>{cit.source} (صفحة {cit.page_number})</span>
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 💬 Actual Bot Message Text */}
+      {inquiryShowText && (displayedText || isThinkingDone) && (
+        <div style={{ whiteSpace: 'pre-line', fontSize: '0.92rem', lineHeight: '1.7', textAlign: 'right', direction: 'rtl' }} className={isInquiry ? 'animate-fade-in' : ''}>
+          {displayedText}
+          {!isTypingCompleted && isThinkingDone && <span className="cursor-blink"></span>}
+        </div>
+      )}
+
+      {/* Render TRANSACTIONAL Action Confirmation Card */}
+      {isTransaction && isTypingCompleted && (
+        <div className="action-confirmation-card animate-fade-in" style={{ marginTop: '0.75rem' }}>
+          <div className="action-card-header">
+            <i className="fa-solid fa-clipboard-check action-card-icon"></i>
+            <span className="action-card-title">{msg.actionWidget.title_ar}</span>
+          </div>
+          <div className="action-card-summary">{msg.actionWidget.summary_ar}</div>
+          <div className="action-card-fields">
+            {msg.actionWidget.fields.map((f, fIdx) => (
+              <div key={fIdx} className="action-card-field-row">
+                <span className="action-field-label">{f.label_ar}</span>
+                <span className="action-field-value">{f.value}</span>
+              </div>
+            ))}
+          </div>
+          {activePendingAction && activePendingAction.action_id === msg.actionWidget.action_id && (
+            <div className="action-card-actions">
+              <button 
+                className="action-btn-confirm"
+                onClick={() => executePendingAction(msg.actionWidget.action_id)}
+              >
+                <i className="fa-solid fa-check"></i>
+                تأكيد وإرسال (Submit)
+              </button>
+              <button 
+                className="action-btn-cancel"
+                onClick={() => {
+                  useChatStore.setState({ activePendingAction: null });
+                  sendQuery('إلغاء المعاملة');
+                }}
+              >
+                إلغاء
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 🔧 Action Buttons (Copy) */}
+      {isTypingCompleted && (
+        <div className="message-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '0.4rem', justifyContent: 'flex-start', direction: 'rtl' }}>
+          <button 
+            onClick={handleCopy} 
+            className="action-icon-btn action-icon-btn-copy" 
+            title="نسخ الرد"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem', borderRadius: '4px' }}
+          >
+            <i className={`fa-solid ${copied ? 'fa-check' : 'fa-copy'}`} style={{ color: copied ? 'var(--success)' : '' }} />
+            <span>{copied ? 'تم النسخ' : 'نسخ'}</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UserMessageBubble({ msg, index, setInputValue }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(msg.text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleEdit = () => {
+    setInputValue(msg.text);
+    const inputEl = document.getElementById('chat-input');
+    if (inputEl) {
+      inputEl.focus();
+    }
+  };
+
+  return (
+    <div className="message-bubble">
+      <div style={{ whiteSpace: 'pre-line', fontSize: '0.92rem', lineHeight: '1.7', textAlign: 'right', direction: 'rtl' }}>
+        {msg.text}
+      </div>
+      <div className="message-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.4rem', justifyContent: 'flex-end', direction: 'rtl' }}>
+        <button 
+          onClick={handleEdit} 
+          className="action-icon-btn" 
+          title="تعديل الرسالة"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem', borderRadius: '4px' }}
+        >
+          <i className="fa-solid fa-pen-to-square" />
+          <span>تعديل</span>
+        </button>
+        <button 
+          onClick={handleCopy} 
+          className="action-icon-btn" 
+          title="نسخ الرسالة"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem', borderRadius: '4px' }}
+        >
+          <i className={`fa-solid ${copied ? 'fa-check' : 'fa-copy'}`} style={{ color: copied ? 'var(--success)' : '' }} />
+          <span>{copied ? 'تم النسخ' : 'نسخ'}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function AssistantView() {
   const [inputValue, setInputValue] = useState('');
-  const [expandedThinking, setExpandedThinking] = useState({});
-  const [completedInquiries, setCompletedInquiries] = useState({}); // Keep track of completed inquiry animations by msgIndex
   const messagesEndRef = useRef(null);
 
   const messages = useChatStore((state) => state.messages);
@@ -60,13 +348,6 @@ export default function AssistantView() {
   const sendQuery = useChatStore((state) => state.sendQuery);
   const executePendingAction = useChatStore((state) => state.executePendingAction);
   const activePendingAction = useChatStore((state) => state.activePendingAction);
-
-  const toggleThinking = (idx) => {
-    setExpandedThinking((prev) => ({
-      ...prev,
-      [idx]: !prev[idx],
-    }));
-  };
 
   const handleSend = () => {
     const query = inputValue.trim();
@@ -137,129 +418,41 @@ export default function AssistantView() {
               </div>
             </div>
           ) : (
-            messages.map((msg, index) => {
-              const hasWidget = msg.actionWidget !== undefined && msg.actionWidget !== null;
-              const isTransaction = hasWidget && msg.actionWidget.action_type === 'TRANSACTIONAL';
-              const isInquiry = hasWidget && msg.actionWidget.action_type === 'INQUIRY';
-              
-              // Determine whether to display the text yet for inquiry actions
-              const inquiryShowText = !isInquiry || completedInquiries[index] === true;
-
-              return (
-                <div key={index} className={`message-wrapper ${msg.sender}`}>
-                  <div className="message-bubble-container" style={{ width: '100%' }}>
-                    <div className="message-bubble">
-                      
-                      {/* Inquiry Animation Handling */}
-                      {isInquiry && !completedInquiries[index] && (
-                        <InquiryLoadingCard 
-                          steps={msg.actionWidget.status_steps_ar || []} 
-                          onComplete={() => {
-                            setCompletedInquiries(prev => ({ ...prev, [index]: true }));
-                          }}
-                        />
-                      )}
-
-                      {/* Display response text (fades in for inquiry after animation) */}
-                      {inquiryShowText && (
-                        <div style={{ whiteSpace: 'pre-line' }} className={isInquiry ? 'animate-fade-in' : ''}>
-                          {msg.text}
-                        </div>
-                      )}
-
-                      {/* Render TRANSACTIONAL Action Confirmation Card */}
-                      {isTransaction && (
-                        <div className="action-confirmation-card">
-                          <div className="action-card-header">
-                            <i className="fa-solid fa-clipboard-check action-card-icon"></i>
-                            <span className="action-card-title">{msg.actionWidget.title_ar}</span>
-                          </div>
-                          <div className="action-card-summary">{msg.actionWidget.summary_ar}</div>
-                          <div className="action-card-fields">
-                            {msg.actionWidget.fields.map((f, fIdx) => (
-                              <div key={fIdx} className="action-card-field-row">
-                                <span className="action-field-label">{f.label_ar}</span>
-                                <span className="action-field-value">{f.value}</span>
-                              </div>
-                            ))}
-                          </div>
-                          {/* Only show buttons if this is the active pending action in store */}
-                          {activePendingAction && activePendingAction.action_id === msg.actionWidget.action_id && (
-                            <div className="action-card-actions">
-                              <button 
-                                className="action-btn-confirm"
-                                onClick={() => executePendingAction(msg.actionWidget.action_id)}
-                              >
-                                <i className="fa-solid fa-check"></i>
-                                تأكيد وإرسال (Submit)
-                              </button>
-                              <button 
-                                className="action-btn-cancel"
-                                onClick={() => {
-                                  useChatStore.setState({ activePendingAction: null });
-                                  sendQuery('إلغاء المعاملة');
-                                }}
-                              >
-                                إلغاء
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Citations / References Section */}
-                      {msg.sender === 'bot' && inquiryShowText && msg.responseData && msg.responseData.execution_details && msg.responseData.execution_details.citations && msg.responseData.execution_details.citations.length > 0 && (
-                        <div className="thinking-process-container">
-                          <button
-                            className="thinking-process-toggle"
-                            onClick={() => toggleThinking(index)}
-                          >
-                            <i className={`fa-solid ${expandedThinking[index] ? 'fa-chevron-up' : 'fa-chevron-down'}`} style={{ marginLeft: '0.4rem' }}></i>
-                            <span>🧠 عرض مراجع السياسات المسترجعة</span>
-                          </button>
-
-                          {expandedThinking[index] && (
-                            <div className="thinking-process-content">
-                              {msg.responseData.execution_details.citations.map((cit, cIdx) => (
-                                <div key={cIdx} className="citation-block">
-                                  <div className="citation-text">
-                                    "{cit.text}"
-                                  </div>
-                                  <div className="citation-meta">
-                                    <a
-                                      href={`http://127.0.0.1:8081/policies-files/${cit.category}/${cit.source}#page=${cit.page_number}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="citation-link"
-                                    >
-                                      <i className="fa-solid fa-file-pdf"></i>
-                                      <span>{cit.source} (صفحة {cit.page_number})</span>
-                                    </a>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="message-meta">
-                      <span>{msg.time}</span>
-                    </div>
+            messages.map((msg, index) => (
+              <div key={index} className={`message-wrapper ${msg.sender}`}>
+                <div className="message-bubble-container" style={{ width: '100%' }}>
+                  {msg.sender === 'user' ? (
+                    <UserMessageBubble 
+                      msg={msg} 
+                      index={index} 
+                      setInputValue={setInputValue} 
+                    />
+                  ) : (
+                    <BotMessageBubble 
+                      msg={msg} 
+                      index={index}
+                      activePendingAction={activePendingAction}
+                      executePendingAction={executePendingAction}
+                      sendQuery={sendQuery}
+                    />
+                  )}
+                  <div className="message-meta">
+                    <span>{msg.time}</span>
                   </div>
                 </div>
-              );
-            })
+              </div>
+            ))
           )}
 
           {isWaitingResponse && (
             <div className="message-wrapper bot">
-              <div className="message-bubble">
-                <div className="typing-indicator">يفكر
-                  <div className="typing-dot"></div>
-                  <div className="typing-dot"></div>
-                  <div className="typing-dot"></div>
+              <div className="message-bubble-container" style={{ width: '100%' }}>
+                <div className="message-bubble">
+                  <div className="typing-indicator">يفكر
+                    <div className="typing-dot"></div>
+                    <div className="typing-dot"></div>
+                    <div className="typing-dot"></div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -1,7 +1,9 @@
 import os
 import uuid
+import json
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from core.security.auth import verify_jwt_or_bearer_token, UserPrincipal
 from services.orchestrator_service.di.container import get_container
@@ -84,6 +86,50 @@ async def process_chat(
         execution_details=result["execution_details"],
         action_payload=result.get("action_payload")
     )
+
+@router.post("/chat/stream")
+async def process_chat_stream(
+    request: ChatRequest, 
+    principal: UserPrincipal = Depends(verify_jwt_or_bearer_token)
+):
+    """
+    Server-Sent Events (SSE) streaming chat endpoint.
+    Streams token-by-token output from the LLM client in real-time.
+    """
+    session_id = request.session_id or str(uuid.uuid4().hex[:12])
+    tenant_id = principal.tenant_id
+    emp_id = request.employee_id or principal.employee_id
+
+    logger.info(
+        "Streaming chat request received", 
+        extra_fields={
+            "session_id": session_id, 
+            "tenant_id": tenant_id, 
+            "employee_id": emp_id,
+            "query": request.query
+        }
+    )
+
+    container = get_container()
+    orchestrator = container.flow_orchestrator
+
+    async def event_generator():
+        try:
+            async for chunk in orchestrator.handle_message_stream(
+                session_id=session_id,
+                tenant_id=tenant_id,
+                query=request.query,
+                override_employee_id=emp_id
+            ):
+                # Ensure session_id is returned in the payload
+                chunk["session_id"] = session_id
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            logger.error(f"Error in chat stream event generator: {str(e)}", exc_info=True)
+            err_payload = {"error": {"message": f"حدث خطأ أثناء معالجة البث: {str(e)}"}}
+            yield f"data: {json.dumps(err_payload, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @router.get("/chats")
 def get_user_chats(principal: UserPrincipal = Depends(verify_jwt_or_bearer_token)):

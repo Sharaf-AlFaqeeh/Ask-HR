@@ -109,7 +109,9 @@ export const useChatStore = create((set, get) => ({
     }));
 
     set({ isWaitingResponse: true });
-    appStore.addConsoleLog(`إرسال طلب محادثة: "${query}"...`, 'info');
+    appStore.addConsoleLog(`إرسال طلب محادثة بث (Streaming): "${query}"...`, 'info');
+
+    let botMessageIndex = -1;
 
     try {
       const payload = { query };
@@ -117,7 +119,7 @@ export const useChatStore = create((set, get) => ({
         payload.session_id = get().sessionId;
       }
 
-      const response = await fetch(`${baseUrl}/api/v1/chat`, {
+      const response = await fetch(`${baseUrl}/api/v1/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -140,49 +142,142 @@ export const useChatStore = create((set, get) => ({
         return;
       }
 
-      const result = await response.json();
-      
-      // Update session ID if returned
-      if (result.session_id) {
-        set({ sessionId: result.session_id });
-        metricsStore.setActiveSessions(1);
-      }
-
-      const endTime = performance.now();
-      const latency = Math.round(endTime - startTime);
-
-      // Update metrics & charts
-      metricsStore.updateMetrics(latency, result.sap_executed, result.intent);
-
-      // Append bot message
+      // Initialize reader for text/event-stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
       const botTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-      
-      // Check if response contains action payload (UI widget for confirmation/loading)
-      let pendingAction = null;
-      if (result.action_payload) {
-        pendingAction = result.action_payload;
-        appStore.addConsoleLog(`تم تلقي قالب واجهة إجراء تفاعلي: ${result.action_payload.action_id} (${result.action_payload.action_type})`, 'info');
+
+      // Add empty bot message first with raw text buffers
+      set((state) => {
+        const nextMessages = [...state.messages, { 
+          sender: 'bot', 
+          text: '', 
+          rawTextBuffer: '', 
+          rawTextTarget: '', 
+          isStreamClosed: false,
+          citations: [],
+          time: botTime 
+        }];
+        botMessageIndex = nextMessages.length - 1;
+        return { messages: nextMessages };
+      });
+
+      // Hide loading spinner as stream starts arriving
+      set({ isWaitingResponse: false });
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Split buffer by SSE event boundaries (\n\n)
+        const parts = buffer.split('\n\n');
+        // Keep the last partial event in the buffer
+        buffer = parts.pop();
+
+        for (const part of parts) {
+          const trimmedPart = part.trim();
+          if (!trimmedPart || !trimmedPart.startsWith('data: ')) continue;
+
+          const dataStr = trimmedPart.substring(5).trim();
+          if (!dataStr) continue;
+
+          try {
+            const data = JSON.parse(dataStr);
+            if (data.error) {
+              set((state) => {
+                const nextMessages = [...state.messages];
+                nextMessages[botMessageIndex].text = `⚠️ خطأ: ${data.error.message}`;
+                nextMessages[botMessageIndex].rawTextTarget = `⚠️ خطأ: ${data.error.message}`;
+                nextMessages[botMessageIndex].isStreamClosed = true;
+                return { messages: nextMessages };
+              });
+              appStore.addConsoleLog(`خطأ في البث: ${data.error.message}`, 'error');
+              break;
+            }
+
+            if (data.is_thinking) {
+              set((state) => {
+                const nextMessages = [...state.messages];
+                const currentMsg = nextMessages[botMessageIndex];
+                if (currentMsg) {
+                  currentMsg.citations = data.execution_details?.citations || [];
+                }
+                return { messages: nextMessages };
+              });
+              appStore.addConsoleLog(`بدء تفكير الوكيل وقراءة لوائح الموارد البشرية...`, 'info');
+              continue;
+            }
+
+            if (data.response !== undefined) {
+              set((state) => {
+                const nextMessages = [...state.messages];
+                const currentMsg = nextMessages[botMessageIndex];
+
+                if (currentMsg) {
+                  if (data.is_chunk) {
+                    // Append chunks to rawTextBuffer
+                    currentMsg.rawTextBuffer = (currentMsg.rawTextBuffer || '') + data.response;
+                    currentMsg.text = currentMsg.rawTextBuffer;
+                  } else {
+                    // Final non-chunk message: override with full text, attach metadata
+                    currentMsg.text = data.response;
+                    currentMsg.rawTextTarget = data.response;
+                    currentMsg.isStreamClosed = true;
+                    currentMsg.responseData = data;
+
+                    let pendingAction = null;
+                    if (data.action_payload) {
+                      pendingAction = data.action_payload;
+                      currentMsg.actionWidget = pendingAction;
+                      set({ activePendingAction: pendingAction });
+                      appStore.addConsoleLog(`تم تلقي قالب واجهة تفاعلي: ${pendingAction.action_id}`, 'info');
+                    }
+
+                    // Update session ID
+                    if (data.session_id) {
+                      set({ sessionId: data.session_id });
+                      metricsStore.setActiveSessions(1);
+                    }
+
+                    // Update metrics
+                    const endTime = performance.now();
+                    const latency = Math.round(endTime - startTime);
+                    metricsStore.updateMetrics(latency, data.sap_executed, data.intent);
+                    agentStore.updateAgentState(data);
+
+                    appStore.addConsoleLog(`تم اكتمال استقبال البث بنجاح. نية المستخدم: '${data.intent}' خلال ${latency}ms`, 'success');
+                  }
+                }
+
+                return { messages: nextMessages };
+              });
+            }
+          } catch (jsonErr) {
+            console.error('Error parsing SSE data chunk:', jsonErr, dataStr);
+          }
+        }
       }
 
-      set((state) => ({
-        messages: [...state.messages, { sender: 'bot', text: result.response, responseData: result, time: botTime, actionWidget: pendingAction }],
-        activePendingAction: pendingAction
-      }));
-
-      // Update state tracker panel
-      agentStore.updateAgentState(result);
-
-      appStore.addConsoleLog(`تم الاستلام بنجاح. نية المستخدم: '${result.intent}' خلال ${latency}ms`, 'success');
-      
-      // Refresh sidebar list
+      // Refresh sidebar sessions list
       get().fetchSessions();
 
     } catch (err) {
       const botTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-      set((state) => ({
-        messages: [...state.messages, { sender: 'bot', text: `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`, time: botTime }]
-      }));
-      appStore.addConsoleLog(`خطأ شبكة: ${err.message}`, 'error');
+      set((state) => {
+        const nextMessages = [...state.messages];
+        if (botMessageIndex >= 0 && nextMessages[botMessageIndex]) {
+          nextMessages[botMessageIndex].text = `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`;
+          nextMessages[botMessageIndex].rawTextTarget = `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`;
+          nextMessages[botMessageIndex].isStreamClosed = true;
+        } else {
+          nextMessages.push({ sender: 'bot', text: `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`, rawTextTarget: `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`, isStreamClosed: true, time: botTime });
+        }
+        return { messages: nextMessages };
+      });
+      appStore.addConsoleLog(`خطأ اتصال: ${err.message}`, 'error');
     } finally {
       set({ isWaitingResponse: false });
     }

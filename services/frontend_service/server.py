@@ -1,6 +1,6 @@
 import os
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
@@ -9,6 +9,15 @@ app = FastAPI(
     description="Lightweight static portal service for AskHR Enterprise UI",
     version="1.2.0"
 )
+
+# Add middleware to disable caching for static assets during active development
+@app.middleware("http")
+async def add_no_cache_header(request: Request, call_next):
+    response: Response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 # Get absolute path of current directory
 current_dir = os.path.dirname(os.path.abspath(__file__))

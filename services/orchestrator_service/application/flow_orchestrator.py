@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, AsyncGenerator
 from services.orchestrator_service.domain.models import SessionState, Message
 from services.orchestrator_service.domain.interfaces import (
     ILLMClient, IRetriever, IHRSystemClient, ISessionStore, INLPPipeline
@@ -414,6 +414,478 @@ class FlowOrchestrator:
             execution_details=execution_details
         )
 
+    async def handle_message_stream(
+        self, 
+        session_id: str, 
+        tenant_id: str, 
+        query: str,
+        override_employee_id: Optional[str] = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Streaming version of handle_message. Yields intermediate token chunks and
+        saves the final accumulated response to storage at the end of the stream.
+        """
+        set_tenant_id(tenant_id)
+        start_time = time.time()
+        logger.info(
+            f"Processing message in streaming flow orchestrator", 
+            extra_fields={"session_id": session_id, "tenant_id": tenant_id, "query": query}
+        )
+
+        # 1. Retrieve or create session state
+        session_start = time.time()
+        session = self.session_store.get_session(session_id, tenant_id)
+        session.add_message(role="user", content=query)
+        
+        if override_employee_id:
+            session.employee_id = override_employee_id.upper()
+        session_duration = time.time() - session_start
+
+        # 2. Run Intent Routing and Entity Extraction
+        nlp_start = time.time()
+        has_pending = session.pending_action is not None
+        intent, confidence, entities = await self.nlp_pipeline.analyze_query(query, has_pending_action=has_pending)
+        
+        if session.pending_action and intent != "SAP":
+            logger.info(
+                f"Active pending action '{session.pending_action.action_name}' found. "
+                "Forcing SAP context to process parameter filling."
+            )
+            intent = "SAP"
+            confidence = 1.0
+        nlp_duration = time.time() - nlp_start
+
+        # 2.5. Intercept SAP actions in production — redirect to phone.
+        if intent == "SAP" and not self.settings.sap.mock_mode:
+            redirect_response = (
+                "مرحباً 👋\n\n"
+                "حالياً لا يمكنني تنفيذ هذا الإجراء من خلال النظام.\n"
+                "لتقديم طلب إجازة أو أي إجراء آخر، يرجى التواصل مع مركز الخدمة للموارد البشرية على الرقم التالي:\n\n"
+                "📞 **123456789**\n\n"
+                "سيسعد فريق الموارد البشرية بمساعدتك! 😊"
+            )
+            session.add_message(role="assistant", content=redirect_response)
+            session.pending_action = None
+            self.session_store.save_session(session)
+
+            yield self._build_response_payload(
+                query=query,
+                intent=intent,
+                confidence=confidence,
+                entities=entities,
+                response=redirect_response,
+                context_used=False,
+                sap_executed=False,
+                session_pending=False,
+                is_chunk=False
+            )
+            return
+
+        # 3. Pass to Dialog Manager (Slot Filling / Dialog state)
+        dialog_start = time.time()
+        missing_prompt, action_params = self.dialog_manager.process_dialog_turn(
+            session=session,
+            intent=intent,
+            entities=entities
+        )
+        dialog_duration = time.time() - dialog_start
+
+        response_text = ""
+        context_used = False
+        sap_executed = False
+        execution_details = {}
+        action_payload = None
+
+        action_start = time.time()
+        # 4. If missing details, prompt the user (streams LLM response)
+        if missing_prompt:
+            logger.info("SAP action missing fields. Retrieving RAG context to provide helpful policy info...")
+            citations = self.retriever.retrieve_context_with_metadata(query)
+            
+            if citations:
+                # Yield thinking and citations instantly
+                yield self._build_response_payload(
+                    query=query,
+                    intent=intent,
+                    confidence=confidence,
+                    entities=entities,
+                    response="",
+                    context_used=True,
+                    sap_executed=sap_executed,
+                    session_pending=True,
+                    execution_details={"citations": citations},
+                    is_chunk=True,
+                    is_thinking=True
+                )
+                context_blocks = []
+                for cit in citations:
+                    source = cit["source"]
+                    page_num = cit.get("page_number")
+                    if page_num:
+                        context_blocks.append(f"[مصدر: {source} (صفحة {page_num})]\n{cit['text']}")
+                    else:
+                        context_blocks.append(f"[مصدر: {source}]\n{cit['text']}")
+                context = "\n\n---\n\n".join(context_blocks)
+                
+                system_instruction = (
+                    "أنت خبير الموارد البشرية لمجموعة هائل سعيد أنعم (HSA Group).\n"
+                    "تلقى المستخدم طلباً لمعاملة إدارية في نظام الموارد البشرية، وهناك بعض البيانات الناقصة المطلوبة لإتمامه.\n"
+                    "باستخدام معلومات السياسات المرفقة أدناه، قدم للمستخدم إجابة مفيدة تشرح فيها القواعد والشروط الخاصة بالسياسة ذات الصلة بوضوح مع الاستشهاد بذكر اسم المستند والصفحة كمرجع.\n"
+                    "ثم في نهاية ردك، اطلب من المستخدم بلطف تزويدك بالبيانات الناقصة المطلوبة لإتمام إجراء المعاملة التجريبية.\n\n"
+                    f"البيانات الناقصة المطلوب طلبها من المستخدم:\n{missing_prompt}\n\n"
+                    "سياق سياسات الموارد البشرية المسترجعة:\n"
+                    "=========================================\n"
+                    f"{context}\n"
+                    "=========================================\n"
+                )
+                messages = [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": query}
+                ]
+                context_used = True
+            else:
+                system_instruction = (
+                    "أنت خبير الموارد البشرية لمجموعة هائل سعيد أنعم (HSA Group).\n"
+                    "تلقى المستخدم طلباً لمعاملة إدارية وهناك بيانات ناقصة.\n"
+                    "قم بصياغة طلب البيانات الناقصة التالي بأسلوب حواري مهني وودود للغاية باللغة العربية الفصحى:\n"
+                    f"{missing_prompt}"
+                )
+                messages = [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": query}
+                ]
+                context_used = False
+
+            logger.info("Invoking streaming LLM to synthesize slot-filling prompt...")
+            response_text_chunks = []
+            async for chunk in self.llm_client.query_llm_stream(messages):
+                response_text_chunks.append(chunk)
+                yield self._build_response_payload(
+                    query=query,
+                    intent=intent,
+                    confidence=confidence,
+                    entities=entities,
+                    response=chunk,
+                    context_used=context_used,
+                    sap_executed=sap_executed,
+                    session_pending=True,
+                    is_chunk=True
+                )
+            
+            response_text = "".join(response_text_chunks)
+            session.add_message(role="assistant", content=response_text)
+            self.session_store.save_session(session)
+            
+            yield self._build_response_payload(
+                query=query,
+                intent=intent,
+                confidence=confidence,
+                entities=entities,
+                response=response_text,
+                context_used=context_used,
+                sap_executed=sap_executed,
+                session_pending=True,
+                execution_details={"citations": citations} if citations else {},
+                is_chunk=False
+            )
+            return
+
+        # 5. If SAP Action is fully qualified, execute it or prompt for confirmation!
+        if action_params:
+            action_name = session.pending_action.action_name if session.pending_action else "get_profile"
+            if "leave_type" in action_params and "start_date" in action_params:
+                action_name = "request_leave"
+            elif "month" in action_params:
+                action_name = "get_salary_slip"
+                
+            emp_id = str(action_params.get("employee_id") or "")
+            logger.info(f"Routing SAP Action: {action_name} for employee: {emp_id}")
+            
+            from services.orchestrator_service.actions.registry import get_action_registry
+            from services.orchestrator_service.actions.base import ActionType
+            
+            registry = get_action_registry()
+            action = registry.get(action_name)
+            
+            if action:
+                is_valid, err_msg = action.validate(action_params)
+                if not is_valid:
+                    response_text = f"⚠️ {err_msg}"
+                    session.add_message(role="assistant", content=response_text)
+                    self.session_store.save_session(session)
+                    yield self._build_response_payload(
+                        query=query,
+                        intent=intent,
+                        confidence=confidence,
+                        entities=entities,
+                        response=response_text,
+                        context_used=False,
+                        sap_executed=False,
+                        session_pending=True,
+                        is_chunk=False
+                    )
+                    return
+                
+                if action.action_type == ActionType.TRANSACTIONAL:
+                    action_payload = action.get_ui_template(action_params)
+                    response_text = (
+                        f"لقد قمت بتجهيز طلب {action.name_ar} الخاص بك.\n"
+                        f"يرجى مراجعة وتأكيد البيانات المعروضة في البطاقة أدناه للموافقة على الإرسال والتنفيذ في نظام SAP."
+                    )
+                    from services.orchestrator_service.domain.models import PendingAction
+                    if not session.pending_action:
+                        session.pending_action = PendingAction(action_name=action_name)
+                    session.pending_action.parameters = action_params
+                    session.add_message(role="assistant", content=response_text)
+                    self.session_store.save_session(session)
+                    
+                    yield self._build_response_payload(
+                        query=query,
+                        intent=intent,
+                        confidence=confidence,
+                        entities=entities,
+                        response=response_text,
+                        context_used=False,
+                        sap_executed=False,
+                        session_pending=True,
+                        execution_details={"citations": []},
+                        action_payload=action_payload,
+                        is_chunk=False
+                    )
+                    return
+                else:
+                    # Inquiry
+                    sap_executed = True
+                    action_payload = action.get_ui_template(action_params)
+                    
+                    try:
+                        exec_res = action.execute(emp_id, action_params)
+                        execution_details = exec_res
+                        
+                        if action_name == "get_salary_slip":
+                            if self.settings.orchestrator.use_sap_templates:
+                                response_text = ResponseTemplates.get_salary_slip_response(
+                                    employee_id=emp_id,
+                                    month=exec_res.get("month", ""),
+                                    basic_salary=exec_res.get("basic_salary", 0.0),
+                                    housing_allowance=exec_res.get("housing_allowance", 0.0),
+                                    transport_allowance=exec_res.get("transport_allowance", 0.0),
+                                    deductions=exec_res.get("deductions", 0.0),
+                                    net_salary=exec_res.get("net_salary", 0.0)
+                                )
+                                session.pending_action = None
+                                session.add_message(role="assistant", content=response_text)
+                                self.session_store.save_session(session)
+                                
+                                yield self._build_response_payload(
+                                    query=query,
+                                    intent=intent,
+                                    confidence=confidence,
+                                    entities=entities,
+                                    response=response_text,
+                                    context_used=False,
+                                    sap_executed=True,
+                                    session_pending=False,
+                                    execution_details=execution_details,
+                                    action_payload=action_payload,
+                                    is_chunk=False
+                                )
+                                return
+                            else:
+                                llm_instruction = PromptRegistry.SAP_GET_SALARY_SLIP_USER.format(
+                                    employee_id=emp_id,
+                                    month=exec_res.get("month", ""),
+                                    basic_salary=exec_res.get("basic_salary", 0.0),
+                                    housing_allowance=exec_res.get("housing_allowance", 0.0),
+                                    transport_allowance=exec_res.get("transport_allowance", 0.0),
+                                    deductions=exec_res.get("deductions", 0.0),
+                                    net_salary=exec_res.get("net_salary", 0.0)
+                                )
+                                messages = [
+                                    {"role": "system", "content": PromptRegistry.SAP_SYSTEM},
+                                    {"role": "user", "content": llm_instruction}
+                                ]
+                                response_text_chunks = []
+                                async for chunk in self.llm_client.query_llm_stream(messages):
+                                    response_text_chunks.append(chunk)
+                                    yield self._build_response_payload(
+                                        query=query,
+                                        intent=intent,
+                                        confidence=confidence,
+                                        entities=entities,
+                                        response=chunk,
+                                        context_used=False,
+                                        sap_executed=True,
+                                        session_pending=False,
+                                        is_chunk=True
+                                    )
+                                response_text = "".join(response_text_chunks)
+                                session.pending_action = None
+                                session.add_message(role="assistant", content=response_text)
+                                self.session_store.save_session(session)
+                                
+                                yield self._build_response_payload(
+                                    query=query,
+                                    intent=intent,
+                                    confidence=confidence,
+                                    entities=entities,
+                                    response=response_text,
+                                    context_used=False,
+                                    sap_executed=True,
+                                    session_pending=False,
+                                    execution_details=execution_details,
+                                    action_payload=action_payload,
+                                    is_chunk=False
+                                )
+                                return
+                        else:
+                            response_text = f"تفاصيل الاستعلام الخاصة بك: {exec_res}"
+                            session.pending_action = None
+                            session.add_message(role="assistant", content=response_text)
+                            self.session_store.save_session(session)
+                            yield self._build_response_payload(
+                                query=query,
+                                intent=intent,
+                                confidence=confidence,
+                                entities=entities,
+                                response=response_text,
+                                context_used=False,
+                                sap_executed=True,
+                                session_pending=False,
+                                execution_details=execution_details,
+                                action_payload=action_payload,
+                                is_chunk=False
+                            )
+                            return
+                    except Exception as ex:
+                        logger.error(f"Error executing SAP action {action_name}: {ex}", exc_info=True)
+                        response_text = f"عذراً، فشل جلب البيانات من نظام SAP: {str(ex)}"
+                        session.pending_action = None
+                        session.add_message(role="assistant", content=response_text)
+                        self.session_store.save_session(session)
+                        yield self._build_response_payload(
+                            query=query,
+                            intent=intent,
+                            confidence=confidence,
+                            entities=entities,
+                            response=response_text,
+                            context_used=False,
+                            sap_executed=False,
+                            session_pending=False,
+                            is_chunk=False
+                        )
+                        return
+            else:
+                response_text = f"عذراً، الإجراء {action_name} غير مدعوم في النظام حالياً."
+                session.pending_action = None
+                session.add_message(role="assistant", content=response_text)
+                self.session_store.save_session(session)
+                yield self._build_response_payload(
+                    query=query,
+                    intent=intent,
+                    confidence=confidence,
+                    entities=entities,
+                    response=response_text,
+                    context_used=False,
+                    sap_executed=False,
+                    session_pending=False,
+                    is_chunk=False
+                )
+                return
+
+        # 6. RAG Pipeline execution (General Policies) - streams LLM response
+        else:
+            logger.info("Running RAG context retrieval...")
+            citations = self.retriever.retrieve_context_with_metadata(query)
+            
+            if citations:
+                context_used = True
+                # Yield thinking and citations instantly
+                yield self._build_response_payload(
+                    query=query,
+                    intent=intent,
+                    confidence=confidence,
+                    entities=entities,
+                    response="",
+                    context_used=context_used,
+                    sap_executed=sap_executed,
+                    session_pending=False,
+                    execution_details={"citations": citations},
+                    is_chunk=True,
+                    is_thinking=True
+                )
+                context_blocks = []
+                for cit in citations:
+                    source = cit["source"]
+                    page_num = cit.get("page_number")
+                    if page_num:
+                        context_blocks.append(f"[مصدر: {source} (صفحة {page_num})]\n{cit['text']}")
+                    else:
+                        context_blocks.append(f"[مصدر: {source}]\n{cit['text']}")
+                context = "\n\n---\n\n".join(context_blocks)
+                
+                system_instructions = PromptRegistry.RAG_SYSTEM_TEMPLATE.format(context=context)
+                messages = [{"role": "system", "content": system_instructions}]
+                for hist_msg in session.history[-4:-1]:
+                    messages.append({"role": hist_msg.role, "content": hist_msg.content})
+                messages.append({"role": "user", "content": query})
+                
+                response_text_chunks = []
+                async for chunk in self.llm_client.query_llm_stream(messages):
+                    response_text_chunks.append(chunk)
+                    yield self._build_response_payload(
+                        query=query,
+                        intent=intent,
+                        confidence=confidence,
+                        entities=entities,
+                        response=chunk,
+                        context_used=context_used,
+                        sap_executed=sap_executed,
+                        session_pending=False,
+                        is_chunk=True
+                    )
+                response_text = "".join(response_text_chunks)
+                execution_details = {"citations": citations}
+            else:
+                logger.warning("No context found in RAG collection. Falling back to default assistant prompt.")
+                messages = [
+                    {"role": "system", "content": PromptRegistry.FALLBACK_SYSTEM},
+                    {"role": "user", "content": query}
+                ]
+                response_text_chunks = []
+                async for chunk in self.llm_client.query_llm_stream(messages):
+                    response_text_chunks.append(chunk)
+                    yield self._build_response_payload(
+                        query=query,
+                        intent=intent,
+                        confidence=confidence,
+                        entities=entities,
+                        response=chunk,
+                        context_used=False,
+                        sap_executed=False,
+                        session_pending=False,
+                        is_chunk=True
+                    )
+                response_text = "".join(response_text_chunks)
+
+        # 7. Update and save session history
+        session.add_message(role="assistant", content=response_text)
+        self.session_store.save_session(session)
+        
+        # Yield the final complete result
+        yield self._build_response_payload(
+            query=query,
+            intent=intent,
+            confidence=confidence,
+            entities=entities,
+            response=response_text,
+            context_used=context_used,
+            sap_executed=sap_executed,
+            session_pending=session.pending_action is not None,
+            execution_details=execution_details,
+            is_chunk=False
+        )
+
     def _build_response_payload(
         self,
         query: str,
@@ -425,7 +897,9 @@ class FlowOrchestrator:
         sap_executed: bool,
         session_pending: bool,
         execution_details: Optional[Dict[str, Any]] = None,
-        action_payload: Optional[Dict[str, Any]] = None
+        action_payload: Optional[Dict[str, Any]] = None,
+        is_chunk: bool = False,
+        is_thinking: bool = False
     ) -> Dict[str, Any]:
         return {
             "query": query,
@@ -437,5 +911,7 @@ class FlowOrchestrator:
             "sap_executed": sap_executed,
             "session_pending": session_pending,
             "execution_details": execution_details or {},
-            "action_payload": action_payload
+            "action_payload": action_payload,
+            "is_chunk": is_chunk,
+            "is_thinking": is_thinking
         }

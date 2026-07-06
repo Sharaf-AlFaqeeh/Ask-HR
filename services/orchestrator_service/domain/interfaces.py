@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, AsyncGenerator
 from services.orchestrator_service.domain.models import (
     SessionState, EmployeeProfile, LeaveRequestResponse, SalarySlipResponse
 )
@@ -8,6 +8,16 @@ class ILLMClient(ABC):
     @abstractmethod
     async def query_llm(self, messages: List[Dict[str, str]], temperature: Optional[float] = None, max_tokens: Optional[int] = None) -> str:
         """Sends messages to the LLM and retrieves the response."""
+        pass
+
+    @abstractmethod
+    async def query_llm_stream(
+        self, 
+        messages: List[Dict[str, str]], 
+        temperature: Optional[float] = None, 
+        max_tokens: Optional[int] = None
+    ) -> AsyncGenerator[str, None]:
+        """Sends messages to the LLM and yields the response chunks."""
         pass
 
 class IRetriever(ABC):
