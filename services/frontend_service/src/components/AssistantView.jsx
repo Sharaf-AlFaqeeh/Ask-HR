@@ -392,7 +392,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
             </button>
 
             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-              {!isThinkingDone ? '⚙️ جاري مراجعة وتحليل لوائح السياسات...' : '🧠 مراجع السياسات المسترجعة'}
+              {!isThinkingDone ? '⚙️ جاري مراجعة وتحليل لوائح السياسات...' : ''}
             </span>
           </div>
 
@@ -524,28 +524,24 @@ function UserMessageBubble({ msg, index, setInputValue }) {
   };
 
   return (
-    <div className="message-bubble">
+    <div className="message-bubble user-bubble-wrapper">
       <div style={{ whiteSpace: 'pre-line', fontSize: '0.92rem', lineHeight: '1.7', textAlign: 'right', direction: 'rtl' }}>
         {msg.text}
       </div>
-      <div className="message-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.4rem', justifyContent: 'flex-end', direction: 'rtl' }}>
+      <div className="user-message-actions">
         <button
           onClick={handleEdit}
-          className="action-icon-btn"
+          className="user-action-btn"
           title="تعديل الرسالة"
-          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem', borderRadius: '4px' }}
         >
           <i className="fa-solid fa-pen-to-square" />
-          <span>تعديل</span>
         </button>
         <button
           onClick={handleCopy}
-          className="action-icon-btn"
-          title="نسخ الرسالة"
-          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem', borderRadius: '4px' }}
+          className="user-action-btn"
+          title={copied ? "تم نسخ النص" : "نسخ الرسالة"}
         >
           <i className={`fa-solid ${copied ? 'fa-check' : 'fa-copy'}`} style={{ color: copied ? 'var(--success)' : '' }} />
-          <span>{copied ? 'تم النسخ' : 'نسخ'}</span>
         </button>
       </div>
     </div>

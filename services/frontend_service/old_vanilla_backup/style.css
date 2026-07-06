@@ -1111,9 +1111,9 @@ body[dir="ltr"] .activity-table {
 }
 
 .message-avatar.user {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid var(--border-color);
-    color: #fff;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
 }
 
 .message-avatar.bot {
@@ -1136,10 +1136,11 @@ body[dir="ltr"] .activity-table {
 }
 
 .message-wrapper.user .message-bubble {
-    background: linear-gradient(135deg, var(--hsa-blue), #002855);
+    background: linear-gradient(135deg, #131722, #090c12); /* Royal Black / Dimmed Charcoal */
     color: #fff;
     border-top-right-radius: 4px;
-    box-shadow: 0 4px 15px var(--hsa-blue-glow);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 .message-wrapper.bot .message-bubble {
