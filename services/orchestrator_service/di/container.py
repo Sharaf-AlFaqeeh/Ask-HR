@@ -1,7 +1,7 @@
 from services.orchestrator_service.infrastructure.llm_clients.openai_client import OpenAICompatibleLLMClient
 from services.orchestrator_service.infrastructure.rag.qdrant_retriever import QdrantRetrieverAdapter
 from services.orchestrator_service.infrastructure.hr_systems.sap_client import SAPSuccessFactorsAdapter
-from services.orchestrator_service.infrastructure.storage.sqlite_store import SQLiteSessionStore
+from services.orchestrator_service.domain.interfaces import ISessionStore
 from services.orchestrator_service.infrastructure.nlp.hybrid_nlp import HybridNLPPipeline
 from services.orchestrator_service.application.flow_orchestrator import FlowOrchestrator
 from core.logger import get_logger
@@ -27,13 +27,38 @@ class DIContainer:
             
         logger.info("Initializing DI Container and wiring enterprise dependencies...")
         
-        # 1. Instantiate Adapters
+        # 1. Load Settings
+        from core.config_manager import get_settings
+        settings = get_settings()
+        
+        # 2. Instantiate Adapters
         self.llm_client = OpenAICompatibleLLMClient()
         self.retriever = QdrantRetrieverAdapter()
         self.hr_client = SAPSuccessFactorsAdapter()
-        self.session_store = SQLiteSessionStore()
         
-        # 2. Instantiate NLP Pipeline (passing LLM Client for semantic fallback)
+        # Initialize selected Session Store
+        self.session_store: ISessionStore
+        storage_type = settings.storage.type.lower()
+        if storage_type == "redis":
+            from services.orchestrator_service.infrastructure.storage.redis_store import RedisSessionStore
+            logger.info(f"Wiring RedisSessionStore adapter to host={settings.storage.redis.host}:{settings.storage.redis.port}")
+            self.session_store = RedisSessionStore(
+                host=settings.storage.redis.host,
+                port=settings.storage.redis.port,
+                db=settings.storage.redis.db,
+                password=settings.storage.redis.password,
+                ttl=settings.storage.session_ttl
+            )
+        elif storage_type == "in_memory":
+            from services.orchestrator_service.infrastructure.storage.in_memory import InMemorySessionStore
+            logger.info("Wiring InMemorySessionStore adapter...")
+            self.session_store = InMemorySessionStore()
+        else:
+            from services.orchestrator_service.infrastructure.storage.sqlite_store import SQLiteSessionStore
+            logger.info("Wiring SQLiteSessionStore adapter...")
+            self.session_store = SQLiteSessionStore()
+        
+        # 3. Instantiate NLP Pipeline (passing LLM Client for semantic fallback)
         self.nlp_pipeline = HybridNLPPipeline(self.llm_client)
         
         # 3. Instantiate and wire FlowOrchestrator

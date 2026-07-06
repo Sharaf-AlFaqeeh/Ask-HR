@@ -261,9 +261,9 @@ def clean_arabic_text(text: str, is_safety_policy: bool = False) -> str:
     text = text.replace("[الترجمة]:", "")
     text = text.replace("[النصوص المصاحبة]:", "")
     
-    # 1. Standardize Arabic prefixes (األ -> الأ, اإل -> الإ, اآل -> الآ, اأ -> الأ)
-    text = text.replace("األ", "الأ")
-    text = text.replace("اإل", "الإ")
+    # 1. Standardize Arabic prefixes (الأ -> الأ, الإ -> الإ, اآل -> الآ, اأ -> الأ)
+    text = text.replace("الأ", "الأ")
+    text = text.replace("الإ", "الإ")
     text = text.replace("اآل", "الآ")
     text = text.replace("اأ", "الأ")
     

@@ -53,3 +53,14 @@ sap:
 frontend:
   host: "127.0.0.1"
   port: 8082
+
+# Session Storage Settings (SQLite locally, Redis/DynamoDB in production)
+storage:
+  type: "sqlite"              # Options: sqlite, redis, in_memory
+  session_ttl: 2592000        # Session expiration TTL (30 days in seconds)
+  redis:
+    host: "127.0.0.1"
+    port: 6379
+    db: 0
+    password: null
+

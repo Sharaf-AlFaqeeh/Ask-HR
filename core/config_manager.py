@@ -41,6 +41,17 @@ class SAPSettings(BaseModel):
     client_id: str = "ask_hr_orchestrator"
     mock_mode: bool = True
 
+class RedisSettings(BaseModel):
+    host: str = "127.0.0.1"
+    port: int = 6379
+    db: int = 0
+    password: Optional[str] = None
+
+class StorageSettings(BaseModel):
+    type: str = "sqlite"
+    session_ttl: int = 2592000
+    redis: RedisSettings = Field(default_factory=RedisSettings)
+
 class EnterpriseSettings(BaseSettings):
     """
     Combines config.yaml settings with environment overrides.
@@ -56,6 +67,7 @@ class EnterpriseSettings(BaseSettings):
     vector_db: VectorDBSettings = Field(default_factory=VectorDBSettings)
     orchestrator: OrchestratorSettings = Field(default_factory=OrchestratorSettings)
     sap: SAPSettings = Field(default_factory=SAPSettings)
+    storage: StorageSettings = Field(default_factory=StorageSettings)
     
     # Environment variables that override YAML values (or default settings)
     api_bearer_token: str = Field(default="askhr_super_secret_token_2026", validation_alias="API_BEARER_TOKEN")
@@ -101,16 +113,43 @@ def load_settings(config_path: str = "config.yaml") -> EnterpriseSettings:
     if db_path:
         yaml_data.setdefault("vector_db", {})["storage_path"] = db_path
 
+    # Apply Storage overrides
+    storage_type = os.getenv("STORAGE_TYPE")
+    if storage_type:
+        yaml_data.setdefault("storage", {})["type"] = storage_type
+
+    storage_ttl = os.getenv("STORAGE_SESSION_TTL")
+    if storage_ttl:
+        yaml_data.setdefault("storage", {})["session_ttl"] = int(storage_ttl)
+
+    redis_host = os.getenv("REDIS_HOST")
+    if redis_host:
+        yaml_data.setdefault("storage", {}).setdefault("redis", {})["host"] = redis_host
+
+    redis_port = os.getenv("REDIS_PORT")
+    if redis_port:
+        yaml_data.setdefault("storage", {}).setdefault("redis", {})["port"] = int(redis_port)
+
+    redis_db = os.getenv("REDIS_DB")
+    if redis_db:
+        yaml_data.setdefault("storage", {}).setdefault("redis", {})["db"] = int(redis_db)
+
+    redis_password = os.getenv("REDIS_PASSWORD")
+    if redis_password:
+        yaml_data.setdefault("storage", {}).setdefault("redis", {})["password"] = redis_password
+
     # Load with pydantic-settings (Environment variables override YAML settings)
     _settings = EnterpriseSettings(
         app=AppSettings(**yaml_data.get("app", {})),
         llm=LLMSettings(**yaml_data.get("llm", {})),
         vector_db=VectorDBSettings(**yaml_data.get("vector_db", {})),
         orchestrator=OrchestratorSettings(**yaml_data.get("orchestrator", {})),
-        sap=SAPSettings(**yaml_data.get("sap", {}))
+        sap=SAPSettings(**yaml_data.get("sap", {})),
+        storage=StorageSettings(**yaml_data.get("storage", {}))
     )
     
     return _settings
+
 
 def get_settings() -> EnterpriseSettings:
     """

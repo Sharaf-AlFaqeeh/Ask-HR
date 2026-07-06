@@ -57,8 +57,11 @@ services:
     environment:
       - ENV=production
       - LLM_API_URL=http://llm_inference:8000/v1
+      - STORAGE_TYPE=redis
+      - REDIS_HOST=redis
     depends_on:
       - llm_inference
+      - redis
     restart: always
 
   # 4. Frontend Portal Service (Sleek static file server)
@@ -77,3 +80,17 @@ services:
     depends_on:
       - orchestrator
     restart: always
+
+  # 5. High-Performance Session Storage (Redis)
+  redis:
+    image: redis:7-alpine
+    container_name: askhr_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
+volumes:
+  redis_data:
+
