@@ -20,7 +20,7 @@ def test_session_manager_redirect_on_missing_slots_production(monkeypatch):
         "month": None
     }
     
-    prompt, params = manager.process_dialog_turn(session, intent, entities)
+    prompt, params, form_payload = manager.process_dialog_turn(session, intent, entities)
     assert prompt is not None
     assert "حالياً لا يمكنني تنفيذ هذا الإجراء من خلال النظام" in prompt
     assert params is None
@@ -44,10 +44,13 @@ def test_session_manager_slot_filling_in_development(monkeypatch):
         "month": None
     }
     
-    prompt, params = manager.process_dialog_turn(session, intent, entities)
+    prompt, params, form_payload = manager.process_dialog_turn(session, intent, entities)
+    # Since employee_id is also missing, we expect a text prompt for it, and the form_payload as well
     assert prompt is not None
-    assert "يرجى تزويدي بـ" in prompt
+    assert "الرقم الوظيفي" in prompt
     assert params is None
+    assert form_payload is not None
+    assert form_payload["form_type"] == "leave_request"
     # Pending action must remain active to continue collecting inputs
     assert session.pending_action is not None
     assert session.pending_action.action_name == "request_leave"
@@ -66,9 +69,10 @@ def test_session_manager_immediate_resolution_all_slots():
         "month": None
     }
     
-    prompt, params = manager.process_dialog_turn(session, intent, entities)
+    prompt, params, form_payload = manager.process_dialog_turn(session, intent, entities)
     assert prompt is None
     assert params is not None
+    assert form_payload is None
     assert params["employee_id"] == "EMP102"
     assert params["leave_type"] == "ANNUAL_LEAVE"
     assert params["start_date"] == "2026-06-01"

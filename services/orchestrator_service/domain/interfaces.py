@@ -18,7 +18,9 @@ class ILLMClient(ABC):
         max_tokens: Optional[int] = None
     ) -> AsyncGenerator[str, None]:
         """Sends messages to the LLM and yields the response chunks."""
-        pass
+        if False:
+            yield ""
+
 
 class IRetriever(ABC):
     @abstractmethod

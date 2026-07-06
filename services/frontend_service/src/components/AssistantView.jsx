@@ -31,8 +31,8 @@ function InquiryLoadingCard({ steps, onComplete }) {
           const isActive = idx === currentStep;
           const isCompleted = idx < currentStep;
           return (
-            <div 
-              key={idx} 
+            <div
+              key={idx}
               className={`action-loading-step-row ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
               style={{ direction: 'rtl', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}
             >
@@ -49,7 +49,208 @@ function InquiryLoadingCard({ steps, onComplete }) {
   );
 }
 
-function BotMessageBubble({ msg, index, activePendingAction, executePendingAction, sendQuery }) {
+// Leave Request Form — Professional structured form for leave details
+function LeaveRequestForm({ formData, onSubmit, onCancel }) {
+  const [leaveType, setLeaveType] = useState(formData?.fields?.leave_type?.value || '');
+  const [startDate, setStartDate] = useState(formData?.fields?.start_date?.value || '');
+  const [endDate, setEndDate] = useState(formData?.fields?.end_date?.value || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const leaveOptions = formData?.fields?.leave_type?.options || [];
+  const startInferred = formData?.fields?.start_date?.inferred || false;
+  const endInferred = formData?.fields?.end_date?.inferred || false;
+
+  // Calculate duration
+  const calcDays = () => {
+    if (!startDate || !endDate) return null;
+    try {
+      const s = new Date(startDate);
+      const e = new Date(endDate);
+      if (isNaN(s) || isNaN(e)) return null;
+      const diff = Math.floor((e - s) / (1000 * 60 * 60 * 24)) + 1;
+      return diff > 0 ? diff : null;
+    } catch { return null; }
+  };
+  const totalDays = calcDays();
+
+  const handleSubmit = async () => {
+    if (!leaveType || !startDate || !endDate) return;
+    setIsSubmitting(true);
+    await onSubmit({ leave_type: leaveType, start_date: startDate, end_date: endDate });
+    setIsSubmitting(false);
+  };
+
+  const isValid = leaveType && startDate && endDate && totalDays && totalDays > 0;
+
+  return (
+    <div className="leave-form-card animate-fade-in" style={{ direction: 'rtl', marginTop: '10px' }}>
+      <div className="leave-form-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+        <i className="fa-solid fa-calendar-plus leave-form-icon" style={{ color: 'var(--hsa-gold)' }}></i>
+        <span className="leave-form-title" style={{ fontWeight: 'bold', fontSize: '0.95rem' }}>{formData?.title_ar || '📋 تفاصيل طلب الإجازة'}</span>
+      </div>
+      <div className="leave-form-description" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>{formData?.description_ar}</div>
+
+      {/* Leave Type Select */}
+      <div className="leave-form-field" style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label className="leave-form-label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          نوع الإجازة
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <select
+            className="leave-form-select"
+            value={leaveType}
+            onChange={(e) => setLeaveType(e.target.value)}
+            style={{
+              flex: 1,
+              backgroundColor: 'var(--hsa-navy-input)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '8px',
+              padding: '8px',
+              color: '#fff',
+              outline: 'none'
+            }}
+          >
+            <option value="">— اختر نوع الإجازة —</option>
+            {leaveOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label_ar}</option>
+            ))}
+          </select>
+          {leaveType && formData?.fields?.leave_type?.value === leaveType && (
+            <span className="leave-form-inferred-badge" style={{ fontSize: '0.7rem', color: 'var(--hsa-gold)', backgroundColor: 'rgba(212,175,55,0.1)', padding: '4px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+              <i className="fa-solid fa-wand-magic-sparkles"></i>
+              مُستنتج
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Start Date */}
+      <div className="leave-form-field" style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label className="leave-form-label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          تاريخ البداية
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input
+            type="date"
+            className="leave-form-date-input"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            style={{
+              flex: 1,
+              backgroundColor: 'var(--hsa-navy-input)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '8px',
+              padding: '8px',
+              color: '#fff',
+              outline: 'none'
+            }}
+          />
+          {startInferred && startDate && formData?.fields?.start_date?.value === startDate && (
+            <span className="leave-form-inferred-badge" style={{ fontSize: '0.7rem', color: 'var(--hsa-gold)', backgroundColor: 'rgba(212,175,55,0.1)', padding: '4px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+              <i className="fa-solid fa-wand-magic-sparkles"></i>
+              مُستنتج
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* End Date */}
+      <div className="leave-form-field" style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label className="leave-form-label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          تاريخ النهاية
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input
+            type="date"
+            className="leave-form-date-input"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            style={{
+              flex: 1,
+              backgroundColor: 'var(--hsa-navy-input)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '8px',
+              padding: '8px',
+              color: '#fff',
+              outline: 'none'
+            }}
+          />
+          {endInferred && endDate && formData?.fields?.end_date?.value === endDate && (
+            <span className="leave-form-inferred-badge" style={{ fontSize: '0.7rem', color: 'var(--hsa-gold)', backgroundColor: 'rgba(212,175,55,0.1)', padding: '4px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+              <i className="fa-solid fa-wand-magic-sparkles"></i>
+              مُستنتج
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Dynamic Summary */}
+      {totalDays !== null && totalDays > 0 && (
+        <div className="leave-form-summary" style={{ fontSize: '0.85rem', color: 'var(--success)', backgroundColor: 'rgba(16,185,129,0.08)', padding: '8px', borderRadius: '8px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <i className="fa-solid fa-clock"></i>
+          <span>مدة الإجازة: <strong>{totalDays} {totalDays === 1 ? 'يوم' : totalDays === 2 ? 'يومان' : totalDays <= 10 ? 'أيام' : 'يوماً'}</strong></span>
+        </div>
+      )}
+
+      {/* Validation Message */}
+      {!isValid && (leaveType || startDate || endDate) && (
+        <div className="leave-form-validation" style={{ fontSize: '0.8rem', color: 'var(--danger)', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {!leaveType && <span>⚠️ يرجى اختيار نوع الإجازة</span>}
+          {!startDate && <span>⚠️ يرجى تحديد تاريخ البداية</span>}
+          {!endDate && <span>⚠️ يرجى تحديد تاريخ النهاية</span>}
+          {startDate && endDate && totalDays !== null && totalDays <= 0 && (
+            <span>⚠️ تاريخ النهاية يجب أن يكون بعد تاريخ البداية</span>
+          )}
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="leave-form-actions" style={{ display: 'flex', gap: '8px' }}>
+        <button
+          className="leave-form-submit"
+          onClick={handleSubmit}
+          disabled={!isValid || isSubmitting}
+          style={{
+            flex: 1.5,
+            background: (!isValid || isSubmitting) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, var(--hsa-gold), var(--hsa-gold-dark))',
+            color: (!isValid || isSubmitting) ? 'var(--text-muted)' : '#1a1204',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '8px 12px',
+            fontSize: '0.85rem',
+            fontWeight: 'bold',
+            cursor: (!isValid || isSubmitting) ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}
+        >
+          {isSubmitting ? 'جاري الإرسال...' : 'إرسال الطلب'}
+        </button>
+      <button
+        className="leave-form-cancel"
+        onClick={onCancel}
+        disabled={isSubmitting}
+        style={{
+          flex: 1,
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          color: 'var(--text-secondary)',
+          borderRadius: '8px',
+          padding: '8px 12px',
+          fontSize: '0.85rem',
+          cursor: 'pointer'
+        }}
+      >
+        إلغاء
+      </button>
+    </div>
+    </div >
+  );
+}
+
+function BotMessageBubble({ msg, index, activePendingAction, executePendingAction, sendQuery, activeLeaveForm, submitLeaveForm }) {
   const [displayedText, setDisplayedText] = useState('');
   const [thinkingText, setThinkingText] = useState('');
   const [isThinkingDone, setIsThinkingDone] = useState(false);
@@ -150,15 +351,15 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
   const hasWidget = msg.actionWidget !== undefined && msg.actionWidget !== null;
   const isTransaction = hasWidget && msg.actionWidget.action_type === 'TRANSACTIONAL';
   const isInquiry = hasWidget && msg.actionWidget.action_type === 'INQUIRY';
-  
+
   const inquiryShowText = !isInquiry || inquiryCompleted;
 
   return (
     <div className="message-bubble">
       {/* Inquiry Animation Handling */}
       {isInquiry && !inquiryCompleted && (
-        <InquiryLoadingCard 
-          steps={msg.actionWidget.status_steps_ar || []} 
+        <InquiryLoadingCard
+          steps={msg.actionWidget.status_steps_ar || []}
           onComplete={() => setInquiryCompleted(true)}
         />
       )}
@@ -254,14 +455,14 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
           </div>
           {activePendingAction && activePendingAction.action_id === msg.actionWidget.action_id && (
             <div className="action-card-actions">
-              <button 
+              <button
                 className="action-btn-confirm"
                 onClick={() => executePendingAction(msg.actionWidget.action_id)}
               >
                 <i className="fa-solid fa-check"></i>
                 تأكيد وإرسال (Submit)
               </button>
-              <button 
+              <button
                 className="action-btn-cancel"
                 onClick={() => {
                   useChatStore.setState({ activePendingAction: null });
@@ -275,12 +476,24 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
         </div>
       )}
 
+      {/* Render Leave Request Form */}
+      {msg.leaveForm && activeLeaveForm && isTypingCompleted && (
+        <LeaveRequestForm
+          formData={msg.leaveForm}
+          onSubmit={submitLeaveForm}
+          onCancel={() => {
+            useChatStore.setState({ activeLeaveForm: null });
+            sendQuery('إلغاء طلب الإجازة');
+          }}
+        />
+      )}
+
       {/* 🔧 Action Buttons (Copy) */}
       {isTypingCompleted && (
         <div className="message-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '0.4rem', justifyContent: 'flex-start', direction: 'rtl' }}>
-          <button 
-            onClick={handleCopy} 
-            className="action-icon-btn action-icon-btn-copy" 
+          <button
+            onClick={handleCopy}
+            className="action-icon-btn action-icon-btn-copy"
             title="نسخ الرد"
             style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem', borderRadius: '4px' }}
           >
@@ -316,18 +529,18 @@ function UserMessageBubble({ msg, index, setInputValue }) {
         {msg.text}
       </div>
       <div className="message-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.4rem', justifyContent: 'flex-end', direction: 'rtl' }}>
-        <button 
-          onClick={handleEdit} 
-          className="action-icon-btn" 
+        <button
+          onClick={handleEdit}
+          className="action-icon-btn"
           title="تعديل الرسالة"
           style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem', borderRadius: '4px' }}
         >
           <i className="fa-solid fa-pen-to-square" />
           <span>تعديل</span>
         </button>
-        <button 
-          onClick={handleCopy} 
-          className="action-icon-btn" 
+        <button
+          onClick={handleCopy}
+          className="action-icon-btn"
           title="نسخ الرسالة"
           style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem', borderRadius: '4px' }}
         >
@@ -348,6 +561,8 @@ export default function AssistantView() {
   const sendQuery = useChatStore((state) => state.sendQuery);
   const executePendingAction = useChatStore((state) => state.executePendingAction);
   const activePendingAction = useChatStore((state) => state.activePendingAction);
+  const activeLeaveForm = useChatStore((state) => state.activeLeaveForm);
+  const submitLeaveForm = useChatStore((state) => state.submitLeaveForm);
 
   const handleSend = () => {
     const query = inputValue.trim();
@@ -422,18 +637,20 @@ export default function AssistantView() {
               <div key={index} className={`message-wrapper ${msg.sender}`}>
                 <div className="message-bubble-container" style={{ width: '100%' }}>
                   {msg.sender === 'user' ? (
-                    <UserMessageBubble 
-                      msg={msg} 
-                      index={index} 
-                      setInputValue={setInputValue} 
+                    <UserMessageBubble
+                      msg={msg}
+                      index={index}
+                      setInputValue={setInputValue}
                     />
                   ) : (
-                    <BotMessageBubble 
-                      msg={msg} 
+                    <BotMessageBubble
+                      msg={msg}
                       index={index}
                       activePendingAction={activePendingAction}
                       executePendingAction={executePendingAction}
                       sendQuery={sendQuery}
+                      activeLeaveForm={activeLeaveForm}
+                      submitLeaveForm={submitLeaveForm}
                     />
                   )}
                   <div className="message-meta">

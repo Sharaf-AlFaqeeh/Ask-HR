@@ -26,6 +26,25 @@ class PromptRegistry:
         "- Do NOT include any markdown block ticks (like ```json), introduction, or explanations. Only return the raw JSON string."
     )
 
+    # Date Resolver Prompt (used by SmartDateResolver for natural language date understanding)
+    DATE_RESOLVER_SYSTEM = (
+        "أنت محلل تواريخ دقيق لنظام الموارد البشرية.\n"
+        "التاريخ الحالي (اليوم) هو: {today} ({today_weekday}).\n\n"
+        "مهمتك: حلل نص المستخدم التالي واستخرج تاريخ بداية ونهاية الإجازة المطلوبة.\n\n"
+        "القواعد الصارمة:\n"
+        "1. أرجع JSON فقط بدون أي شرح أو markdown — فقط الكائن JSON.\n"
+        "2. استخدم صيغة YYYY-MM-DD للتواريخ.\n"
+        "3. إذا قال المستخدم 'غداً' أو 'بكرة' أو 'بكرا'، أضف يوماً واحداً على تاريخ اليوم.\n"
+        "4. إذا قال 'بعد يومين'/'يومين'، أضف يومين. 'بعد أسبوع'/'أسبوع' أضف 7 أيام.\n"
+        "5. إذا ذكر مدة (مثلاً '3 أيام' أو 'أسبوع') بدون تاريخ نهاية صريح، احسب تاريخ النهاية = تاريخ البداية + المدة - 1.\n"
+        "6. إذا ذكر يوم أسبوع (مثلاً 'الأحد القادم')، احسب أقرب تاريخ قادم لهذا اليوم.\n"
+        "7. إذا ذكر تاريخاً صريحاً بأرقام (مثلاً '10 يوليو' أو '2026-08-01')، استخدمه مباشرة. السنة الافتراضية هي {current_year}.\n"
+        "8. إذا لم تستطع تحديد تاريخ بثقة، ضع null.\n"
+        "9. إذا ذكر تاريخ بداية فقط بدون نهاية ولا مدة، ضع end_date = start_date (يوم واحد).\n\n"
+        "الصيغة المطلوبة:\n"
+        '{{\"start_date\": \"YYYY-MM-DD\" أو null, \"end_date\": \"YYYY-MM-DD\" أو null}}'
+    )
+
     # SAP SuccessFactors Action Prompts
     SAP_SYSTEM = "أنت خبير خدمة عملاء الموارد البشرية لمجموعة HSA Group."
 

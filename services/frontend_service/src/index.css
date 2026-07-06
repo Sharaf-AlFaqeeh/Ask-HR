@@ -3017,5 +3017,72 @@ body.light-theme .citation-link:hover {
     color: #fff !important;
 }
 
+/* --- LEAVE REQUEST FORM STYLES --- */
+.leave-form-card {
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.005));
+    border: 1px solid rgba(212, 175, 55, 0.15); /* Sleek gold border tint */
+    border-radius: 18px;
+    padding: 1.25rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    margin-top: 0.75rem;
+    transition: var(--transition-smooth);
+}
 
+.leave-form-card:hover {
+    border-color: rgba(212, 175, 55, 0.3);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
 
+.leave-form-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 0.65rem;
+}
+
+.leave-form-title {
+    color: #fff;
+}
+
+.leave-form-select:focus,
+.leave-form-date-input:focus {
+    border-color: var(--hsa-gold) !important;
+    box-shadow: 0 0 8px rgba(212, 175, 55, 0.2);
+}
+
+/* Custom styling for date inputs calendar icon to match dark theme */
+.leave-form-date-input::-webkit-calendar-picker-indicator {
+    filter: invert(0.8) sepia(50%) saturate(1000%) hue-rotate(5deg);
+    cursor: pointer;
+}
+
+.leave-form-submit {
+    transition: all 0.25s ease;
+}
+
+.leave-form-submit:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+}
+
+.leave-form-cancel {
+    transition: all 0.25s ease;
+}
+
+.leave-form-cancel:hover {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border-color: rgba(239, 68, 68, 0.25) !important;
+    color: #fca5a5 !important;
+}
+
+.leave-form-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(26, 18, 4, 0.2);
+    border-top-color: #1a1204;
+    border-radius: 50%;
+    animation: spinBtn 0.8s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spinBtn {
+    to { transform: rotate(360deg); }
+}

@@ -23,17 +23,28 @@ class SessionManager:
         "month": "الشهر المستهدف لكشف الراتب (مثال: مايو 2026)"
     }
 
+    # Leave type options for the UI form
+    LEAVE_TYPE_OPTIONS = [
+        {"value": "ANNUAL_LEAVE", "label_ar": "إجازة سنوية", "label_en": "Annual Leave"},
+        {"value": "SICK_LEAVE", "label_ar": "إجازة مرضية", "label_en": "Sick Leave"},
+        {"value": "MATERNITY_LEAVE", "label_ar": "إجازة أمومة", "label_en": "Maternity Leave"},
+        {"value": "PATERNITY_LEAVE", "label_ar": "إجازة أبوة", "label_en": "Paternity Leave"},
+        {"value": "UNPAID_LEAVE", "label_ar": "إجازة بدون راتب", "label_en": "Unpaid Leave"},
+    ]
+
     def process_dialog_turn(
         self, 
         session: SessionState, 
         intent: str, 
         entities: Dict[str, Any]
-    ) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    ) -> Tuple[Optional[str], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
         """
         Processes a dialog turn.
-        Returns: Tuple[prompt_for_missing_fields (str), executable_action_params (dict)]
-        If prompt_for_missing_fields is not None, we should display that prompt to the user.
-        If executable_action_params is not None, all required fields are satisfied and we can execute the action.
+        Returns: Tuple[prompt_for_missing_fields (str), executable_action_params (dict), form_payload (dict)]
+        
+        - If prompt_for_missing_fields is not None, we should display that prompt to the user (text-based slot filling).
+        - If executable_action_params is not None, all required fields are satisfied and we can execute the action.
+        - If form_payload is not None, we should render a structured UI form for the user to fill (leave request form).
         """
         # Determine target action name
         action_name = None
@@ -80,7 +91,7 @@ class SessionManager:
 
         # 4. If no pending action (e.g. general RAG query), do nothing
         if not pending:
-            return None, None
+            return None, None, None
 
         # 5. Evaluate required fields for the active action
         req_fields = self.REQUIRED_FIELDS[pending.action_name]
@@ -96,9 +107,9 @@ class SessionManager:
             params = pending.parameters.copy()
             # Clear pending action since it's fully resolved
             session.pending_action = None
-            return None, params
+            return None, params, None
 
-        # 7. Otherwise, formulate a friendly prompt for the first missing field
+        # 7. Otherwise, determine how to prompt for missing fields
         from core.config_manager import get_settings
         settings = get_settings()
 
@@ -111,8 +122,28 @@ class SessionManager:
                 "📞 **123456789**\n\n"
                 "سيسعد فريق الموارد البشرية بمساعدتك! 😊"
             )
-            return prompt, None
+            return prompt, None, None
 
+        # ── NEW: For leave requests with missing dates/type, return a structured form payload ──
+        if pending.action_name == "request_leave":
+            # Check which leave-specific fields are missing (excluding employee_id)
+            leave_missing = [f for f in missing if f != "employee_id"]
+            
+            if leave_missing:
+                # Build form payload with current known values as defaults
+                form_payload = self._build_leave_form_payload(pending.parameters)
+                
+                # If employee_id is the only other missing field, prompt for it via text
+                if "employee_id" in missing and len(missing) > len(leave_missing):
+                    # We need employee_id too — the form will handle leave fields,
+                    # but we still need to prompt for employee_id separately
+                    prompt = f"من أجل إتمام تقديم طلب إجازة، يرجى تزويدي بـ {self.FIELD_NAMES_AR['employee_id']}."
+                    return prompt, None, form_payload
+                
+                # If only leave fields are missing (employee_id already known)
+                return None, None, form_payload
+        
+        # ── Standard text-based slot filling for non-leave actions ──
         # If mock_mode is enabled, prompt for the next missing field to run slot-filling
         next_field = missing[0]
         field_desc = self.FIELD_NAMES_AR.get(next_field, next_field)
@@ -125,4 +156,42 @@ class SessionManager:
             action_desc = "عرض الملف الشخصي"
 
         prompt = f"من أجل إتمام {action_desc}، يرجى تزويدي بـ {field_desc}."
-        return prompt, None
+        return prompt, None, None
+
+    def _build_leave_form_payload(self, current_params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Builds a structured leave form payload for the frontend to render.
+        Includes current known values as defaults and the full list of leave type options.
+        """
+        return {
+            "form_type": "leave_request",
+            "title_ar": "📋 تفاصيل طلب الإجازة",
+            "title_en": "Leave Request Details",
+            "description_ar": "يرجى مراجعة وتعبئة تفاصيل الإجازة أدناه ثم الضغط على إرسال.",
+            "fields": {
+                "leave_type": {
+                    "label_ar": "نوع الإجازة",
+                    "label_en": "Leave Type",
+                    "type": "select",
+                    "value": current_params.get("leave_type"),
+                    "options": self.LEAVE_TYPE_OPTIONS,
+                    "required": True
+                },
+                "start_date": {
+                    "label_ar": "تاريخ البداية",
+                    "label_en": "Start Date",
+                    "type": "date",
+                    "value": current_params.get("start_date"),
+                    "inferred": False,
+                    "required": True
+                },
+                "end_date": {
+                    "label_ar": "تاريخ النهاية",
+                    "label_en": "End Date",
+                    "type": "date",
+                    "value": current_params.get("end_date"),
+                    "inferred": False,
+                    "required": True
+                }
+            }
+        }

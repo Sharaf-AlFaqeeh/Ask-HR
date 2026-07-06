@@ -7,6 +7,7 @@ from services.orchestrator_service.domain.interfaces import (
 from services.orchestrator_service.application.session_manager import SessionManager
 from services.orchestrator_service.application.prompt_registry import PromptRegistry
 from services.orchestrator_service.application.response_templates import ResponseTemplates
+from services.orchestrator_service.nlp.date_resolver import SmartDateResolver
 from core.config_manager import get_settings
 from core.logger import get_logger
 from core.security.tenant import set_tenant_id
@@ -32,6 +33,7 @@ class FlowOrchestrator:
         self.session_store = session_store
         self.nlp_pipeline = nlp_pipeline
         self.dialog_manager = SessionManager()
+        self.date_resolver = SmartDateResolver()
         self.settings = get_settings()
 
     async def handle_message(
@@ -113,7 +115,7 @@ class FlowOrchestrator:
 
         # 3. Pass to Dialog Manager (Slot Filling / Dialog state)
         dialog_start = time.time()
-        missing_prompt, action_params = self.dialog_manager.process_dialog_turn(
+        missing_prompt, action_params, form_payload = self.dialog_manager.process_dialog_turn(
             session=session,
             intent=intent,
             entities=entities
@@ -126,7 +128,37 @@ class FlowOrchestrator:
         execution_details = {}
 
         action_start = time.time()
-        # 4. If missing details, prompt the user
+
+        # 4a. If a structured leave form should be shown, run date resolver and send form payload
+        if form_payload and form_payload.get("form_type") == "leave_request":
+            logger.info("Leave form requested — running smart date resolver...")
+            date_result = await self.date_resolver.resolve(query, self.llm_client)
+            
+            # Enrich form fields with inferred dates
+            if date_result.get("start_date"):
+                form_payload["fields"]["start_date"]["value"] = date_result["start_date"]
+                form_payload["fields"]["start_date"]["inferred"] = date_result.get("inferred", False)
+            if date_result.get("end_date"):
+                form_payload["fields"]["end_date"]["value"] = date_result["end_date"]
+                form_payload["fields"]["end_date"]["inferred"] = date_result.get("inferred", False)
+
+            response_text = "تم تجهيز نموذج طلب الإجازة. يرجى مراجعة التفاصيل أدناه وتعبئة أي حقول ناقصة ثم الضغط على إرسال."
+            session.add_message(role="assistant", content=response_text)
+            self.session_store.save_session(session)
+            
+            return self._build_response_payload(
+                query=query,
+                intent=intent,
+                confidence=confidence,
+                entities=entities,
+                response=response_text,
+                context_used=False,
+                sap_executed=False,
+                session_pending=True,
+                leave_form=form_payload
+            )
+
+        # 4b. If missing details (text-based), prompt the user
         if missing_prompt:
             logger.info("SAP action missing fields. Retrieving RAG context to provide helpful policy info...")
             citations = self.retriever.retrieve_context_with_metadata(query)
@@ -483,7 +515,7 @@ class FlowOrchestrator:
 
         # 3. Pass to Dialog Manager (Slot Filling / Dialog state)
         dialog_start = time.time()
-        missing_prompt, action_params = self.dialog_manager.process_dialog_turn(
+        missing_prompt, action_params, form_payload = self.dialog_manager.process_dialog_turn(
             session=session,
             intent=intent,
             entities=entities
@@ -497,7 +529,39 @@ class FlowOrchestrator:
         action_payload = None
 
         action_start = time.time()
-        # 4. If missing details, prompt the user (streams LLM response)
+
+        # 4a. If a structured leave form should be shown, run date resolver and send form payload
+        if form_payload and form_payload.get("form_type") == "leave_request":
+            logger.info("Leave form requested (stream) — running smart date resolver...")
+            date_result = await self.date_resolver.resolve(query, self.llm_client)
+            
+            # Enrich form fields with inferred dates
+            if date_result.get("start_date"):
+                form_payload["fields"]["start_date"]["value"] = date_result["start_date"]
+                form_payload["fields"]["start_date"]["inferred"] = date_result.get("inferred", False)
+            if date_result.get("end_date"):
+                form_payload["fields"]["end_date"]["value"] = date_result["end_date"]
+                form_payload["fields"]["end_date"]["inferred"] = date_result.get("inferred", False)
+
+            response_text = "تم تجهيز نموذج طلب الإجازة. يرجى مراجعة التفاصيل أدناه وتعبئة أي حقول ناقصة ثم الضغط على إرسال."
+            session.add_message(role="assistant", content=response_text)
+            self.session_store.save_session(session)
+            
+            yield self._build_response_payload(
+                query=query,
+                intent=intent,
+                confidence=confidence,
+                entities=entities,
+                response=response_text,
+                context_used=False,
+                sap_executed=False,
+                session_pending=True,
+                leave_form=form_payload,
+                is_chunk=False
+            )
+            return
+
+        # 4b. If missing details, prompt the user (streams LLM response)
         if missing_prompt:
             logger.info("SAP action missing fields. Retrieving RAG context to provide helpful policy info...")
             citations = self.retriever.retrieve_context_with_metadata(query)
@@ -898,10 +962,11 @@ class FlowOrchestrator:
         session_pending: bool,
         execution_details: Optional[Dict[str, Any]] = None,
         action_payload: Optional[Dict[str, Any]] = None,
+        leave_form: Optional[Dict[str, Any]] = None,
         is_chunk: bool = False,
         is_thinking: bool = False
     ) -> Dict[str, Any]:
-        return {
+        payload = {
             "query": query,
             "intent": intent,
             "confidence": confidence,
@@ -915,3 +980,6 @@ class FlowOrchestrator:
             "is_chunk": is_chunk,
             "is_thinking": is_thinking
         }
+        if leave_form:
+            payload["leave_form"] = leave_form
+        return payload

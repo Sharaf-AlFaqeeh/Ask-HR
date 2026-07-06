@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, AsyncGenerator
 import pytest
 
 # Add root folder to sys.path to resolve core and services imports
@@ -19,6 +19,13 @@ class MockLLMClient(ILLMClient):
         elif "salary" in user_msg or "راتب" in user_msg:
             return "تفاصيل الراتب هي: الأساسي 4000، الصافي 4700 دولارات."
         return "مرحباً! أنا المساعد الذكي لمجموعة HSA."
+
+    async def query_llm_stream(self, messages: List[Dict[str, str]], temperature: Optional[float] = None, max_tokens: Optional[int] = None) -> AsyncGenerator[str, None]:
+        response = await self.query_llm(messages, temperature, max_tokens)
+        # Yield the response in chunks for streaming
+        for word in response.split(" "):
+            yield word + " "
+
 
 class MockRetriever(IRetriever):
     def retrieve_context(self, query: str, limit: int = 3) -> str:

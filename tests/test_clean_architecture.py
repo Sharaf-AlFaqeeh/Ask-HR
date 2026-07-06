@@ -45,5 +45,7 @@ async def test_flow_orchestrator_sap_leave_workflow(mock_llm, mock_retriever, mo
     )
     
     assert result["intent"] == "SAP"
-    assert result["sap_executed"] is True
-    assert result["execution_details"]["request_id"] == "LR-TEST123"
+    assert result["sap_executed"] is False
+    assert result["action_payload"] is not None
+    assert result["action_payload"]["action_id"] == "request_leave"
+

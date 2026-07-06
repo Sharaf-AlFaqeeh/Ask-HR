@@ -34,6 +34,12 @@ class ExecuteActionRequest(BaseModel):
     session_id: str
     action_id: str
 
+class SubmitLeaveFormRequest(BaseModel):
+    session_id: str
+    leave_type: str
+    start_date: str
+    end_date: str
+
 @router.post("/chat", response_model=ChatResponse)
 async def process_chat(
     request: ChatRequest, 
@@ -310,3 +316,81 @@ def execute_action(
             detail=f"حدث خطأ أثناء التنفيذ في SAP: {str(e)}"
         )
 
+@router.post("/chats/submit-leave-form")
+def submit_leave_form(
+    request: SubmitLeaveFormRequest,
+    principal: UserPrincipal = Depends(verify_jwt_or_bearer_token)
+):
+    """
+    Callback endpoint to receive completed leave form data from the frontend.
+    Merges form data into the pending action and generates the TRANSACTIONAL
+    confirmation card for the user to review before final SAP submission.
+    """
+    container = get_container()
+    store = container.session_store
+    
+    if not principal.employee_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="الرقم الوظيفي للموظف غير موجود في رمز الوصول."
+        )
+        
+    session = store.get_session(request.session_id)
+    if session.employee_id and session.employee_id.upper() != principal.employee_id.upper():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="تأكيد غير صالح: هذه الجلسة لا تنتمي لك."
+        )
+        
+    if not session.pending_action or session.pending_action.action_name != "request_leave":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="لا يوجد إجراء إجازة معلق بانتظار التعبئة."
+        )
+        
+    # Merge form data into pending action parameters
+    session.pending_action.parameters["leave_type"] = request.leave_type
+    session.pending_action.parameters["start_date"] = request.start_date
+    session.pending_action.parameters["end_date"] = request.end_date
+    
+    # Ensure employee_id is set
+    if not session.pending_action.parameters.get("employee_id"):
+        session.pending_action.parameters["employee_id"] = principal.employee_id
+    
+    # Validate using the action's validator
+    from services.orchestrator_service.actions.registry import get_action_registry
+    registry = get_action_registry()
+    action = registry.get("request_leave")
+    
+    if not action:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="إجراء طلب الإجازة غير مسجل في النظام."
+        )
+        
+    is_valid, err_msg = action.validate(session.pending_action.parameters)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=err_msg
+        )
+    
+    # Generate the TRANSACTIONAL confirmation card (UI template)
+    action_payload = action.get_ui_template(session.pending_action.parameters)
+    
+    response_msg = (
+        f"لقد قمت بتجهيز طلب {action.name_ar} الخاص بك.\n"
+        f"يرجى مراجعة وتأكيد البيانات المعروضة في البطاقة أدناه للموافقة على الإرسال والتنفيذ في نظام SAP."
+    )
+    
+    session.add_message(role="assistant", content=response_msg)
+    store.save_session(session)
+    
+    logger.info(f"Leave form submitted for session {request.session_id}. Returning confirmation card.")
+    
+    return {
+        "success": True,
+        "response": response_msg,
+        "action_payload": action_payload,
+        "session_pending": True
+    }

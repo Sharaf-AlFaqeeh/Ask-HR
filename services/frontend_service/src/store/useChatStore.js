@@ -10,6 +10,7 @@ export const useChatStore = create((set, get) => ({
   isWaitingResponse: false,
   isIngesting: false,
   activePendingAction: null, // Holds currently pending TRANSACTIONAL action template
+  activeLeaveForm: null, // Holds currently active leave request form data
 
   fetchSessions: async () => {
     const appStore = useAppStore.getState();
@@ -105,7 +106,8 @@ export const useChatStore = create((set, get) => ({
     const userTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
     set((state) => ({
       messages: [...state.messages, { sender: 'user', text: query, time: userTime }],
-      activePendingAction: null // Clear any pending action since user wrote a new query
+      activePendingAction: null, // Clear any pending action since user wrote a new query
+      activeLeaveForm: null // Clear any active leave form
     }));
 
     set({ isWaitingResponse: true });
@@ -236,6 +238,13 @@ export const useChatStore = create((set, get) => ({
                       appStore.addConsoleLog(`تم تلقي قالب واجهة تفاعلي: ${pendingAction.action_id}`, 'info');
                     }
 
+                    // Handle leave form payload
+                    if (data.leave_form) {
+                      currentMsg.leaveForm = data.leave_form;
+                      set({ activeLeaveForm: data.leave_form });
+                      appStore.addConsoleLog(`تم تلقي نموذج طلب إجازة مع تواريخ مستنتجة`, 'info');
+                    }
+
                     // Update session ID
                     if (data.session_id) {
                       set({ sessionId: data.session_id });
@@ -330,6 +339,64 @@ export const useChatStore = create((set, get) => ({
 
     } catch (e) {
       appStore.addConsoleLog(`خطأ اتصال أثناء تأكيد الإجراء: ${e.message}`, 'error');
+      alert(`خطأ اتصال: ${e.message}`);
+    } finally {
+      set({ isWaitingResponse: false });
+    }
+  },
+
+  submitLeaveForm: async (formData) => {
+    const appStore = useAppStore.getState();
+    const sessionId = get().sessionId;
+    if (!sessionId || !appStore.authToken) return;
+
+    set({ isWaitingResponse: true, activeLeaveForm: null });
+    appStore.addConsoleLog(`جاري إرسال نموذج طلب الإجازة...`, 'info');
+
+    try {
+      const response = await fetch(`${baseUrl}/api/v1/chats/submit-leave-form`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${appStore.authToken}`
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          leave_type: formData.leave_type,
+          start_date: formData.start_date,
+          end_date: formData.end_date
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const errMsg = errData?.detail || 'فشل إرسال نموذج طلب الإجازة.';
+        alert(`خطأ: ${errMsg}`);
+        appStore.addConsoleLog(`فشل إرسال نموذج الإجازة: ${errMsg}`, 'error');
+        set({ isWaitingResponse: false });
+        return;
+      }
+
+      const result = await response.json();
+      
+      // Append bot confirmation message with action widget
+      const botTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+      const actionPayload = result.action_payload || null;
+      
+      set((state) => ({
+        messages: [...state.messages, { 
+          sender: 'bot', 
+          text: result.response, 
+          time: botTime,
+          actionWidget: actionPayload
+        }],
+        activePendingAction: actionPayload
+      }));
+
+      appStore.addConsoleLog(`تم تقديم نموذج الإجازة بنجاح — بانتظار التأكيد.`, 'success');
+      
+    } catch (e) {
+      appStore.addConsoleLog(`خطأ اتصال أثناء إرسال نموذج الإجازة: ${e.message}`, 'error');
       alert(`خطأ اتصال: ${e.message}`);
     } finally {
       set({ isWaitingResponse: false });
