@@ -297,7 +297,8 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
     let thinkingCharIdx = 0;
     let responseCharIdx = 0;
     let currentCitIdx = 0;
-    let citCharIdx = 0;
+    let citWordIdx = 0;
+    let citationWordTick = 0;
     let targetThinkingText = '';
     let hasInitializedThinkingText = false;
     let localTypedCitations = [];
@@ -356,20 +357,28 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
           return;
         }
 
-        // 2b. After header is done, type citations one by one
+        // 2b. After header is done, type citation text word-by-word
         if (currentCitIdx < state.citations.length) {
           const currentCit = state.citations[currentCitIdx];
-          if (citCharIdx < currentCit.text.length) {
-            const nextCitText = currentCit.text.substring(0, citCharIdx + 1);
-            localTypedCitations[currentCitIdx] = nextCitText;
-            setTypedCitations([...localTypedCitations]);
-            citCharIdx++;
-          } else {
-            // Finished current citation, move to the next one
-            localTypedCitations[currentCitIdx] = currentCit.text;
-            setTypedCitations([...localTypedCitations]);
-            currentCitIdx++;
-            citCharIdx = 0;
+          const words = currentCit.text.split(/\s+/);
+
+          // We only type a word every 10 ticks (approx 120ms) to look natural and buy time
+          citationWordTick++;
+          if (citationWordTick >= 10) {
+            citationWordTick = 0;
+
+            if (citWordIdx < words.length) {
+              const nextCitText = words.slice(0, citWordIdx + 1).join(' ');
+              localTypedCitations[currentCitIdx] = nextCitText;
+              setTypedCitations([...localTypedCitations]);
+              citWordIdx++;
+            } else {
+              // Finished current citation, move to the next one
+              localTypedCitations[currentCitIdx] = currentCit.text;
+              setTypedCitations([...localTypedCitations]);
+              currentCitIdx++;
+              citWordIdx = 0;
+            }
           }
         } else {
           // All citations fully typed, but response still hasn't arrived
@@ -609,31 +618,66 @@ function UserMessageBubble({ msg, index, setInputValue }) {
 export default function AssistantView() {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   const messages = useChatStore((state) => state.messages);
   const isWaitingResponse = useChatStore((state) => state.isWaitingResponse);
+  const abortController = useChatStore((state) => state.abortController);
   const sendQuery = useChatStore((state) => state.sendQuery);
+  const stopResponse = useChatStore((state) => state.stopResponse);
   const executePendingAction = useChatStore((state) => state.executePendingAction);
   const activePendingAction = useChatStore((state) => state.activePendingAction);
   const activeLeaveForm = useChatStore((state) => state.activeLeaveForm);
   const submitLeaveForm = useChatStore((state) => state.submitLeaveForm);
 
+  const isGenerating = isWaitingResponse || abortController !== null;
+
   const handleSend = () => {
+    if (isGenerating) {
+      stopResponse();
+      setTimeout(() => {
+        if (inputRef.current) inputRef.current.focus();
+      }, 50);
+      return;
+    }
     const query = inputValue.trim();
     if (!query) return;
     setInputValue('');
     sendQuery(query);
+    setTimeout(() => {
+      if (inputRef.current) inputRef.current.focus();
+    }, 50);
   };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
-      if (isWaitingResponse || !inputValue.trim()) {
+      if (isGenerating) {
+        e.preventDefault();
+        return;
+      }
+      if (!inputValue.trim() || activePendingAction) {
         e.preventDefault();
         return;
       }
       handleSend();
     }
   };
+
+  // Auto focus input field on mount
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  // Maintain focus when response state changes and input is not disabled
+  useEffect(() => {
+    if (!isGenerating && activePendingAction === null) {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }
+  }, [isGenerating, activePendingAction]);
 
   // Scroll to bottom on new messages or when waiting state changes
   useEffect(() => {
@@ -674,7 +718,12 @@ export default function AssistantView() {
                   <div
                     key={i}
                     className="suggested-card"
-                    onClick={() => sendQuery(q.text)}
+                    onClick={() => {
+                      sendQuery(q.text);
+                      setTimeout(() => {
+                        if (inputRef.current) inputRef.current.focus();
+                      }, 50);
+                    }}
                     style={{ animationDelay: `${i * 0.08}s` }}
                   >
                     <div className="suggested-card-icon">
@@ -734,6 +783,7 @@ export default function AssistantView() {
         <div className="chat-input-panel">
           <div className="chat-input-wrapper">
             <input
+              ref={inputRef}
               type="text"
               className="chat-input"
               id="chat-input"
@@ -741,15 +791,19 @@ export default function AssistantView() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={activePendingAction !== null || isWaitingResponse}
+              disabled={activePendingAction !== null}
             />
             <button
-              className={`send-btn ${(isWaitingResponse || !inputValue.trim() || activePendingAction) ? 'disabled' : ''} ${inputValue.trim() && !isWaitingResponse && !activePendingAction ? 'has-text' : ''}`}
+              className={`send-btn ${isGenerating ? 'stop-active has-text' : ((!inputValue.trim() || activePendingAction) ? 'disabled' : '')} ${inputValue.trim() && !isGenerating && !activePendingAction ? 'has-text' : ''}`}
               onClick={handleSend}
               id="send-btn"
-              disabled={isWaitingResponse || !inputValue.trim() || activePendingAction !== null}
+              disabled={activePendingAction !== null || (!isGenerating && !inputValue.trim())}
             >
-              <i className="fa-solid fa-paper-plane" style={{ transform: 'rotate(180deg)' }} id="send-icon"></i>
+              {isGenerating ? (
+                <i className="fa-solid fa-stop" id="send-icon" style={{ fontSize: '0.95rem' }}></i>
+              ) : (
+                <i className="fa-solid fa-paper-plane" style={{ transform: 'rotate(180deg)' }} id="send-icon"></i>
+              )}
             </button>
           </div>
           <div className="chat-input-hint">

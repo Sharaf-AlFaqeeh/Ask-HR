@@ -1503,6 +1503,18 @@ body[dir="ltr"] .activity-table {
     animation: spinBtn 0.7s linear infinite;
 }
 
+.send-btn.stop-active {
+    background: linear-gradient(135deg, #f43f5e, #be123c); /* Vibrant rose/crimson gradient */
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(244, 63, 94, 0.45);
+}
+
+.send-btn.stop-active:hover:not(.disabled) {
+    background: linear-gradient(135deg, #fb7185, #e11d48);
+    box-shadow: 0 6px 22px rgba(244, 63, 94, 0.6);
+}
+
+
 @keyframes spinBtn {
     to { transform: rotate(360deg); }
 }

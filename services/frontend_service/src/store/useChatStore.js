@@ -11,6 +11,7 @@ export const useChatStore = create((set, get) => ({
   isIngesting: false,
   activePendingAction: null, // Holds currently pending TRANSACTIONAL action template
   activeLeaveForm: null, // Holds currently active leave request form data
+  abortController: null,
 
   fetchSessions: async () => {
     const appStore = useAppStore.getState();
@@ -110,7 +111,8 @@ export const useChatStore = create((set, get) => ({
       activeLeaveForm: null // Clear any active leave form
     }));
 
-    set({ isWaitingResponse: true });
+    const controller = new AbortController();
+    set({ isWaitingResponse: true, abortController: controller });
     appStore.addConsoleLog(`إرسال طلب محادثة بث (Streaming): "${query}"...`, 'info');
 
     let botMessageIndex = -1;
@@ -127,7 +129,8 @@ export const useChatStore = create((set, get) => ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${appStore.authToken}`
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
 
       if (!response.ok) {
@@ -274,21 +277,42 @@ export const useChatStore = create((set, get) => ({
       get().fetchSessions();
 
     } catch (err) {
-      const botTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-      set((state) => {
-        const nextMessages = [...state.messages];
-        if (botMessageIndex >= 0 && nextMessages[botMessageIndex]) {
-          nextMessages[botMessageIndex].text = `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`;
-          nextMessages[botMessageIndex].rawTextTarget = `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`;
-          nextMessages[botMessageIndex].isStreamClosed = true;
-        } else {
-          nextMessages.push({ sender: 'bot', text: `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`, rawTextTarget: `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`, isStreamClosed: true, time: botTime });
-        }
-        return { messages: nextMessages };
-      });
-      appStore.addConsoleLog(`خطأ اتصال: ${err.message}`, 'error');
+      const isAbort = err.name === 'AbortError';
+      if (isAbort) {
+        set((state) => {
+          const nextMessages = [...state.messages];
+          if (botMessageIndex >= 0 && nextMessages[botMessageIndex]) {
+            nextMessages[botMessageIndex].isStreamClosed = true;
+            nextMessages[botMessageIndex].rawTextTarget = nextMessages[botMessageIndex].rawTextBuffer || 'تم إيقاف الاستجابة من قِبل المستخدم.';
+          }
+          return { messages: nextMessages };
+        });
+        appStore.addConsoleLog('تم إيقاف استجابة البث من قِبل المستخدم.', 'info');
+      } else {
+        const botTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+        set((state) => {
+          const nextMessages = [...state.messages];
+          if (botMessageIndex >= 0 && nextMessages[botMessageIndex]) {
+            nextMessages[botMessageIndex].text = `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`;
+            nextMessages[botMessageIndex].rawTextTarget = `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`;
+            nextMessages[botMessageIndex].isStreamClosed = true;
+          } else {
+            nextMessages.push({ sender: 'bot', text: `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`, rawTextTarget: `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`, isStreamClosed: true, time: botTime });
+          }
+          return { messages: nextMessages };
+        });
+        appStore.addConsoleLog(`خطأ اتصال: ${err.message}`, 'error');
+      }
     } finally {
-      set({ isWaitingResponse: false });
+      set({ isWaitingResponse: false, abortController: null });
+    }
+  },
+
+  stopResponse: () => {
+    const { abortController } = get();
+    if (abortController) {
+      abortController.abort();
+      set({ abortController: null, isWaitingResponse: false });
     }
   },
 
