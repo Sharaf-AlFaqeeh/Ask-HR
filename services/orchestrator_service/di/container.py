@@ -3,6 +3,7 @@ from services.orchestrator_service.infrastructure.rag.qdrant_retriever import Qd
 from services.orchestrator_service.infrastructure.hr_systems.sap_client import SAPSuccessFactorsAdapter
 from services.orchestrator_service.domain.interfaces import ISessionStore
 from services.orchestrator_service.infrastructure.nlp.hybrid_nlp import HybridNLPPipeline
+from services.orchestrator_service.nlp.fast_response_filter import FastResponseFilter
 from services.orchestrator_service.application.flow_orchestrator import FlowOrchestrator
 from core.logger import get_logger
 
@@ -61,13 +62,17 @@ class DIContainer:
         # 3. Instantiate NLP Pipeline (passing LLM Client for semantic fallback)
         self.nlp_pipeline = HybridNLPPipeline(self.llm_client)
         
+        # Instantiate Fast Response Filter
+        self.fast_response_filter = FastResponseFilter()
+        
         # 3. Instantiate and wire FlowOrchestrator
         self.flow_orchestrator = FlowOrchestrator(
             llm_client=self.llm_client,
             retriever=self.retriever,
             hr_client=self.hr_client,
             session_store=self.session_store,
-            nlp_pipeline=self.nlp_pipeline
+            nlp_pipeline=self.nlp_pipeline,
+            fast_response_filter=self.fast_response_filter
         )
         
         self._initialized = True

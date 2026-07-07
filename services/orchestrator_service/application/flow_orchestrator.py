@@ -25,13 +25,15 @@ class FlowOrchestrator:
         retriever: IRetriever,
         hr_client: IHRSystemClient,
         session_store: ISessionStore,
-        nlp_pipeline: INLPPipeline
+        nlp_pipeline: INLPPipeline,
+        fast_response_filter: Optional[Any] = None
     ):
         self.llm_client = llm_client
         self.retriever = retriever
         self.hr_client = hr_client
         self.session_store = session_store
         self.nlp_pipeline = nlp_pipeline
+        self.fast_response_filter = fast_response_filter
         self.dialog_manager = SessionManager()
         self.date_resolver = SmartDateResolver()
         self.settings = get_settings()
@@ -64,6 +66,28 @@ class FlowOrchestrator:
         if override_employee_id:
             session.employee_id = override_employee_id.upper()
         session_duration = time.time() - session_start
+
+        # Intercept query using FastResponseFilter
+        if self.fast_response_filter:
+            fast_response = self.fast_response_filter.match(query)
+            if fast_response:
+                logger.info("Fast response matched — bypassing LLM and RAG pipelines.")
+                session.add_message(role="assistant", content=fast_response)
+                self.session_store.save_session(session)
+                
+                total_duration = time.time() - start_time
+                logger.info(f"Fast response served in {total_duration:.3f}s")
+                
+                return self._build_response_payload(
+                    query=query,
+                    intent="GREETING",
+                    confidence=1.0,
+                    entities={},
+                    response=fast_response,
+                    context_used=False,
+                    sap_executed=False,
+                    session_pending=False
+                )
 
         # 2. Run Intent Routing and Entity Extraction
         nlp_start = time.time()
@@ -472,6 +496,27 @@ class FlowOrchestrator:
         if override_employee_id:
             session.employee_id = override_employee_id.upper()
         session_duration = time.time() - session_start
+
+        # Intercept query using FastResponseFilter
+        if self.fast_response_filter:
+            fast_response = self.fast_response_filter.match(query)
+            if fast_response:
+                logger.info("Fast response matched (stream) — bypassing LLM and RAG pipelines.")
+                session.add_message(role="assistant", content=fast_response)
+                self.session_store.save_session(session)
+                
+                yield self._build_response_payload(
+                    query=query,
+                    intent="GREETING",
+                    confidence=1.0,
+                    entities={},
+                    response=fast_response,
+                    context_used=False,
+                    sap_executed=False,
+                    session_pending=False,
+                    is_chunk=False
+                )
+                return
 
         # 2. Run Intent Routing and Entity Extraction
         nlp_start = time.time()
