@@ -261,6 +261,10 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
 
   const isHistory = !msg.rawTextBuffer && !msg.rawTextTarget && msg.text;
 
+  const [typedCitations, setTypedCitations] = useState(
+    isHistory ? (msg.citations || []).map(c => c.text) : []
+  );
+
   // Sync state values with a ref to avoid stale closure scopes in the setInterval callback
   const stateRef = useRef({
     isHistory,
@@ -292,20 +296,52 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
 
     let thinkingCharIdx = 0;
     let responseCharIdx = 0;
+    let currentCitIdx = 0;
+    let citCharIdx = 0;
     let targetThinkingText = '';
     let hasInitializedThinkingText = false;
+    let localTypedCitations = [];
 
     const interval = setInterval(() => {
       const state = stateRef.current;
 
-      // Phase 1: Thinking typing animation
-      if (!state.isThinkingDone) {
-        if (state.citations.length === 0) {
+      // 1. Check if LLM response has started arriving
+      const hasResponseArrived = (state.rawTextBuffer && state.rawTextBuffer.length > 0) || (state.rawTextTarget && state.rawTextTarget.length > 0);
+
+      if (hasResponseArrived) {
+        // If LLM response has arrived, we want to immediately display all citations fully,
+        // collapse the thinking container, set isThinkingDone to true, and type the response.
+        if (!state.isThinkingDone) {
           state.isThinkingDone = true;
           setIsThinkingDone(true);
+          setIsThinkingExpanded(false);
+          setTypedCitations(state.citations.map(c => c.text));
+        }
+
+        // Phase 2: Response text typing animation
+        const targetResponseText = state.isStreamClosed ? state.rawTextTarget || state.rawTextBuffer : state.rawTextBuffer;
+
+        if (responseCharIdx < targetResponseText.length) {
+          const nextText = targetResponseText.substring(0, responseCharIdx + 1);
+          setDisplayedText(nextText);
+          state.displayedText = nextText;
+          responseCharIdx++;
+        } else if (state.isStreamClosed) {
+          clearInterval(interval);
+          setIsTypingCompleted(true);
+          setIsThinkingExpanded(false); // Auto collapse thinking on completion
+        }
+        return;
+      }
+
+      // 2. If LLM response has NOT arrived yet, we proceed with thinking animations
+      if (!state.isThinkingDone) {
+        // Wait if citations haven't loaded yet
+        if (state.citations.length === 0) {
           return;
         }
 
+        // 2a. Type the initial thinking header
         if (!hasInitializedThinkingText) {
           const docSources = Array.from(new Set(state.citations.map(c => c.source)));
           targetThinkingText = `جاري مراجعة وتحليل لوائح السياسات المسترجعة من مستند [${docSources.join(', ')}]...`;
@@ -317,25 +353,29 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
           setThinkingText(nextText);
           state.thinkingText = nextText;
           thinkingCharIdx++;
+          return;
+        }
+
+        // 2b. After header is done, type citations one by one
+        if (currentCitIdx < state.citations.length) {
+          const currentCit = state.citations[currentCitIdx];
+          if (citCharIdx < currentCit.text.length) {
+            const nextCitText = currentCit.text.substring(0, citCharIdx + 1);
+            localTypedCitations[currentCitIdx] = nextCitText;
+            setTypedCitations([...localTypedCitations]);
+            citCharIdx++;
+          } else {
+            // Finished current citation, move to the next one
+            localTypedCitations[currentCitIdx] = currentCit.text;
+            setTypedCitations([...localTypedCitations]);
+            currentCitIdx++;
+            citCharIdx = 0;
+          }
         } else {
+          // All citations fully typed, but response still hasn't arrived
           state.isThinkingDone = true;
           setIsThinkingDone(true);
         }
-        return;
-      }
-
-      // Phase 2: Response text typing animation
-      const targetResponseText = state.isStreamClosed ? state.rawTextTarget || state.rawTextBuffer : state.rawTextBuffer;
-
-      if (responseCharIdx < targetResponseText.length) {
-        const nextText = targetResponseText.substring(0, responseCharIdx + 1);
-        setDisplayedText(nextText);
-        state.displayedText = nextText;
-        responseCharIdx++;
-      } else if (state.isStreamClosed) {
-        clearInterval(interval);
-        setIsTypingCompleted(true);
-        setIsThinkingExpanded(false); // Auto collapse thinking on completion
       }
     }, 12);
 
@@ -392,7 +432,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
             </button>
 
             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-              {!isThinkingDone ? '⚙️ جاري مراجعة وتحليل لوائح السياسات...' : ''}
+              ⚙️ جاري مراجعة وتحليل لوائح السياسات...
             </span>
           </div>
 
@@ -405,25 +445,30 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
               </div>
 
               {/* Citations references */}
-              {isThinkingDone && msg.citations.map((cit, cIdx) => (
-                <div key={cIdx} className="citation-block" style={{ padding: '0.5rem 0', borderBottom: cIdx < msg.citations.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                  <div className="citation-text" style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '0.25rem', direction: 'rtl', textAlign: 'right' }}>
-                    "{cit.text}"
+              {msg.citations.map((cit, cIdx) => {
+                const typedText = typedCitations[cIdx] || '';
+                if (!typedText) return null; // Don't render if we haven't started typing this citation yet
+                return (
+                  <div key={cIdx} className="citation-block" style={{ padding: '0.5rem 0', borderBottom: cIdx < msg.citations.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                    <div className="citation-text" style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '0.25rem', direction: 'rtl', textAlign: 'right' }}>
+                      "{typedText}"
+                      {cIdx === typedCitations.length - 1 && !isThinkingDone && <span className="cursor-blink"></span>}
+                    </div>
+                    <div className="citation-meta" style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                      <a
+                        href={`http://127.0.0.1:8081/policies-files/${cit.category}/${cit.source}#page=${cit.page_number}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="citation-link"
+                        style={{ fontSize: '0.75rem', color: 'var(--hsa-gold)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                      >
+                        <i className="fa-solid fa-file-pdf"></i>
+                        <span>{cit.source} (صفحة {cit.page_number})</span>
+                      </a>
+                    </div>
                   </div>
-                  <div className="citation-meta" style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                    <a
-                      href={`http://127.0.0.1:8081/policies-files/${cit.category}/${cit.source}#page=${cit.page_number}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="citation-link"
-                      style={{ fontSize: '0.75rem', color: 'var(--hsa-gold)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                    >
-                      <i className="fa-solid fa-file-pdf"></i>
-                      <span>{cit.source} (صفحة {cit.page_number})</span>
-                    </a>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -432,8 +477,21 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
       {/* 💬 Actual Bot Message Text */}
       {inquiryShowText && (displayedText || isThinkingDone) && (
         <div style={{ whiteSpace: 'pre-line', fontSize: '0.92rem', lineHeight: '1.7', textAlign: 'right', direction: 'rtl' }} className={isInquiry ? 'animate-fade-in' : ''}>
-          {displayedText}
-          {!isTypingCompleted && isThinkingDone && <span className="cursor-blink"></span>}
+          {displayedText ? (
+            <>
+              {displayedText}
+              {!isTypingCompleted && <span className="cursor-blink"></span>}
+            </>
+          ) : (
+            !isTypingCompleted && (
+              <div className="typing-indicator" style={{ padding: '0.5rem 0', justifyContent: 'flex-start', direction: 'rtl', height: 'auto' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>جاري التحليل وصياغة الرد</span>
+                <div className="typing-dot" style={{ width: '6px', height: '6px', margin: '0 2px' }}></div>
+                <div className="typing-dot" style={{ width: '6px', height: '6px', margin: '0 2px' }}></div>
+                <div className="typing-dot" style={{ width: '6px', height: '6px', margin: '0 2px' }}></div>
+              </div>
+            )
+          )}
         </div>
       )}
 
