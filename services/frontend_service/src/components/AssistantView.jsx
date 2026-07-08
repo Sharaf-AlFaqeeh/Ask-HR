@@ -330,6 +330,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
         } else if (state.isStreamClosed) {
           clearInterval(interval);
           setIsTypingCompleted(true);
+          setIsThinkingDone(true);
           setIsThinkingExpanded(false); // Auto collapse thinking on completion
         }
         return;
@@ -337,16 +338,31 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
 
       // 2. If LLM response has NOT arrived yet, we proceed with thinking animations
       if (!state.isThinkingDone) {
-        // Wait if citations haven't loaded yet
+        // If citations haven't loaded yet, type a default thinking message
         if (state.citations.length === 0) {
+          if (!hasInitializedThinkingText) {
+            targetThinkingText = `جاري البحث والتحليل في لوائح الموارد البشرية...`;
+            hasInitializedThinkingText = true;
+            thinkingCharIdx = 0;
+          }
+          
+          if (thinkingCharIdx < targetThinkingText.length) {
+            const nextText = targetThinkingText.substring(0, thinkingCharIdx + 1);
+            setThinkingText(nextText);
+            state.thinkingText = nextText;
+            thinkingCharIdx++;
+          }
           return;
         }
 
-        // 2a. Type the initial thinking header
-        if (!hasInitializedThinkingText) {
-          const docSources = Array.from(new Set(state.citations.map(c => c.source)));
-          targetThinkingText = `جاري مراجعة وتحليل لوائح السياسات المسترجعة من مستند [${docSources.join(', ')}]...`;
+        // 2a. If citations exist, format and type the detailed thinking header
+        const docSources = Array.from(new Set(state.citations.map(c => c.source)));
+        const expectedDetailedText = `جاري مراجعة وتحليل لوائح السياسات المسترجعة من مستند [${docSources.join(', ')}]...`;
+        
+        if (!hasInitializedThinkingText || targetThinkingText !== expectedDetailedText) {
+          targetThinkingText = expectedDetailedText;
           hasInitializedThinkingText = true;
+          thinkingCharIdx = 0; // Reset detailed header typing
         }
 
         if (thinkingCharIdx < targetThinkingText.length) {
@@ -414,7 +430,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
       )}
 
       {/* 🧠 Thinking Block */}
-      {inquiryShowText && msg.citations && msg.citations.length > 0 && (
+      {inquiryShowText && (!isThinkingDone || (msg.citations && msg.citations.length > 0)) && (
         <div className="thinking-process-container animate-fade-in" style={{ marginBottom: '0.6rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', direction: 'rtl', justifyContent: 'flex-start' }}>
             <button
@@ -454,7 +470,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
               </div>
 
               {/* Citations references */}
-              {msg.citations.map((cit, cIdx) => {
+              {msg.citations && msg.citations.length > 0 && msg.citations.map((cit, cIdx) => {
                 const typedText = typedCitations[cIdx] || '';
                 if (!typedText) return null; // Don't render if we haven't started typing this citation yet
                 return (
@@ -632,7 +648,7 @@ export default function AssistantView() {
 
   const isGenerating = isWaitingResponse || abortController !== null;
 
-  const handleSend = () => {
+  const handleSend = (overrideQuery) => {
     if (isGenerating) {
       stopResponse();
       setTimeout(() => {
@@ -640,7 +656,7 @@ export default function AssistantView() {
       }, 50);
       return;
     }
-    const query = inputValue.trim();
+    const query = typeof overrideQuery === 'string' ? overrideQuery.trim() : inputValue.trim();
     if (!query) return;
     setInputValue('');
     sendQuery(query);
@@ -719,10 +735,7 @@ export default function AssistantView() {
                     key={i}
                     className="suggested-card"
                     onClick={() => {
-                      sendQuery(q.text);
-                      setTimeout(() => {
-                        if (inputRef.current) inputRef.current.focus();
-                      }, 50);
+                      handleSend(q.text);
                     }}
                     style={{ animationDelay: `${i * 0.08}s` }}
                   >
@@ -764,7 +777,7 @@ export default function AssistantView() {
             ))
           )}
 
-          {isWaitingResponse && (
+          {isWaitingResponse && messages[messages.length - 1]?.sender !== 'bot' && (
             <div className="message-wrapper bot">
               <div className="message-bubble-container" style={{ width: '100%' }}>
                 <div className="message-bubble">

@@ -103,10 +103,23 @@ export const useChatStore = create((set, get) => ({
     const metricsStore = useMetricsStore.getState();
     const agentStore = useAgentStore.getState();
 
-    // Add User Message
+    // Add User Message and an initial Bot Message immediately with default thinking state
     const userTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    const botTime = userTime;
     set((state) => ({
-      messages: [...state.messages, { sender: 'user', text: query, time: userTime }],
+      messages: [
+        ...state.messages,
+        { sender: 'user', text: query, time: userTime },
+        { 
+          sender: 'bot', 
+          text: '', 
+          rawTextBuffer: '', 
+          rawTextTarget: '', 
+          isStreamClosed: false,
+          citations: [],
+          time: botTime 
+        }
+      ],
       activePendingAction: null, // Clear any pending action since user wrote a new query
       activeLeaveForm: null // Clear any active leave form
     }));
@@ -115,7 +128,7 @@ export const useChatStore = create((set, get) => ({
     set({ isWaitingResponse: true, abortController: controller });
     appStore.addConsoleLog(`إرسال طلب محادثة بث (Streaming): "${query}"...`, 'info');
 
-    let botMessageIndex = -1;
+    const botMessageIndex = get().messages.length - 1;
 
     try {
       const payload = { query };
@@ -137,10 +150,17 @@ export const useChatStore = create((set, get) => ({
         const errData = await response.json().catch(() => ({}));
         const errMsg = errData?.error?.message || errData?.detail || 'فشل الاتصال بالخادم الداخلي.';
         
-        const botTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-        set((state) => ({
-          messages: [...state.messages, { sender: 'bot', text: `⚠️ خطأ: ${errMsg}`, time: botTime }]
-        }));
+        set((state) => {
+          const nextMessages = [...state.messages];
+          nextMessages[botMessageIndex] = {
+            sender: 'bot',
+            text: `⚠️ خطأ: ${errMsg}`,
+            rawTextTarget: `⚠️ خطأ: ${errMsg}`,
+            isStreamClosed: true,
+            time: botTime
+          };
+          return { messages: nextMessages };
+        });
         
         appStore.addConsoleLog(`خطأ معالجة الطلب: ${errMsg}`, 'error');
         set({ isWaitingResponse: false });
@@ -151,22 +171,6 @@ export const useChatStore = create((set, get) => ({
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
-      const botTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-
-      // Add empty bot message first with raw text buffers
-      set((state) => {
-        const nextMessages = [...state.messages, { 
-          sender: 'bot', 
-          text: '', 
-          rawTextBuffer: '', 
-          rawTextTarget: '', 
-          isStreamClosed: false,
-          citations: [],
-          time: botTime 
-        }];
-        botMessageIndex = nextMessages.length - 1;
-        return { messages: nextMessages };
-      });
 
       // Hide loading spinner as stream starts arriving
       set({ isWaitingResponse: false });
