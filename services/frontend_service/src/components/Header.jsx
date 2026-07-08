@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useChatStore } from '../store/useChatStore';
 
@@ -69,8 +69,12 @@ export default function Header() {
         onClick={triggerIngest}
         disabled={isIngesting}
       >
-        {isIngesting ? <i className="fa-solid fa-sync fa-spin" style={{ marginLeft: '0.25rem' }}></i> : '+ '}
-        تحديث الفهرس
+        {isIngesting ? (
+          <i className="fa-solid fa-sync fa-spin" style={{ marginLeft: '0.25rem' }}></i>
+        ) : (
+          <span className="btn-icon-plus">+ </span>
+        )}
+        <span className="btn-text">تحديث الفهرس</span>
       </button>
 
       <div className="header-controls">
@@ -84,11 +88,11 @@ export default function Header() {
           <div className="theme-pill-active-bg" style={{ transform: theme === 'light' ? 'translateX(-50%)' : 'translateX(0)' }}></div>
           <span className={`theme-pill-btn ${theme === 'dark' ? 'active' : ''}`} id="theme-pill-dark">
             <i className="fa-solid fa-moon"></i>
-            <span>داكن</span>
+            <span className="toggle-text">داكن</span>
           </span>
           <span className={`theme-pill-btn ${theme === 'light' ? 'active' : ''}`} id="theme-pill-light">
             <i className="fa-solid fa-sun"></i>
-            <span>فاتح</span>
+            <span className="toggle-text">فاتح</span>
           </span>
         </div>
 
@@ -97,21 +101,21 @@ export default function Header() {
           <div className="control-badge"></div>
         </div>
 
-        <div className="control-icon">
+        <div className="control-icon keyboard-shortcut-icon">
           <i className="fa-solid fa-keyboard"></i>
         </div>
 
-        <div className="server-status">
+        <div className="server-status" title={serverStatusText}>
           <div className={`status-dot ${serverStatus === 'offline' || serverStatus === 'warning' ? 'offline' : ''}`} id="server-status-dot"></div>
           <span id="server-status-text">{serverStatusText}</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <div className="user-info-text" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', fontSize: '0.75rem', lineStyle: 'none' }}>
-            <span style={{ fontWeight: 700, color: '#fff' }}>
+        <div className="user-profile-header">
+          <div className="user-info-text">
+            <span className="user-name">
               {loggedInUser ? `${loggedInUser.first_name} ${loggedInUser.last_name}` : 'زائر'}
             </span>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.68rem', direction: 'rtl' }}>
+            <span className="user-dept">
               {loggedInUser ? loggedInUser.department : 'شير بونت SSO'}
             </span>
           </div>
