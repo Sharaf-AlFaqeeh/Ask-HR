@@ -90,7 +90,7 @@ sequenceDiagram
     Flow->>SAP: request_leave(EMP102, ANNUAL_LEAVE, 2026-06-01, 2026-06-15)
     SAP-->>Flow: Success (LR-982X)
     Flow-->>API: Response (Formatted with LLM)
-    API-->>User: "تم تقديم إجازتك السنوية بنجاح للموظف خالد مطهر برقم طلب LR-982X"
+    API-->>User: "تم تقديم إجازتك السنوية بنجاح للموظف Testing User 2 برقم طلب LR-982X"
 ```
 
 ---

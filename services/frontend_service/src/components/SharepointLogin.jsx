@@ -10,9 +10,9 @@ export default function SharepointLogin({ onLoginSuccess }) {
 
   // Quick profiles for simulation
   const mockProfiles = [
-    { name: 'أحمد السعيد', email: 'ahmed.alsaeed@hsagroup.com', role: 'موارد بشرية (HR Specialist)', empId: 'EMP101' },
-    { name: 'خالد مطهر', email: 'khaled.mutahar@hsagroup.com', role: 'الذكاء الاصطناعي (AI Lead)', empId: 'EMP102' },
-    { name: 'سارة جميل', email: 'sarah.jamil@hsagroup.com', role: 'المالية (Financial Analyst)', empId: 'EMP103' },
+    { name: 'Testing User', email: 'ahmed.alsaeed@hsagroup.com', role: 'موارد بشرية (HR Specialist)', empId: 'EMP101' },
+    { name: 'Testing User 2', email: 'khaled.mutahar@hsagroup.com', role: 'الذكاء الاصطناعي (AI Lead)', empId: 'EMP102' },
+    { name: 'Testing User 3', email: 'sarah.jamil@hsagroup.com', role: 'المالية (Financial Analyst)', empId: 'EMP103' },
     { name: 'علي منصور', email: 'ali.mansoor@hsagroup.com', role: 'المبيعات (Sales Rep)', empId: 'EMP104' }
   ];
 
@@ -52,16 +52,16 @@ export default function SharepointLogin({ onLoginSuccess }) {
       }
 
       const result = await response.json();
-      
+
       // Save to localStorage and store
       localStorage.setItem('authToken', result.access_token);
       localStorage.setItem('userProfile', JSON.stringify(result.user));
-      
+
       useAppStore.getState().setAuthToken(result.access_token);
       useAppStore.setState({ loggedInUser: result.user });
 
       addConsoleLog(`تم تسجيل الدخول بنجاح للموظف: ${result.user.first_name} ${result.user.last_name} (${result.user.employee_id})`, 'success');
-      
+
       if (onLoginSuccess) {
         onLoginSuccess();
       }
@@ -82,7 +82,7 @@ export default function SharepointLogin({ onLoginSuccess }) {
   return (
     <div className="login-page-container">
       <div className="login-card-glass">
-        
+
         {/* HSA Corporate SVG Logo */}
         <div className="login-logo-header">
           <svg className="hsa-logo-svg" viewBox="0 0 120 40" width="150" height="50" style={{ margin: '0 auto 0.5rem auto', display: 'block' }}>
@@ -106,8 +106,8 @@ export default function SharepointLogin({ onLoginSuccess }) {
             <label className="form-label">البريد الإلكتروني أو اسم المستخدم المؤسسي</label>
             <div className="input-with-icon">
               <i className="fa-solid fa-envelope input-icon-inner"></i>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="username@hsagroup.com"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -121,8 +121,8 @@ export default function SharepointLogin({ onLoginSuccess }) {
             <label className="form-label">كلمة المرور في نظام SAP / Active Directory</label>
             <div className="input-with-icon">
               <i className="fa-solid fa-lock input-icon-inner"></i>
-              <input 
-                type="password" 
+              <input
+                type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -132,8 +132,8 @@ export default function SharepointLogin({ onLoginSuccess }) {
             </div>
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className={`login-submit-btn ${loading ? 'loading' : ''}`}
             disabled={loading}
           >
@@ -155,8 +155,8 @@ export default function SharepointLogin({ onLoginSuccess }) {
 
         <div className="quick-profiles-grid">
           {mockProfiles.map((profile, idx) => (
-            <div 
-              key={idx} 
+            <div
+              key={idx}
               className="quick-profile-card"
               onClick={() => !loading && handleQuickLogin(profile.email)}
               title={`تسجيل دخول سريع كـ ${profile.name}`}
