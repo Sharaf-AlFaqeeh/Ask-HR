@@ -875,7 +875,7 @@ def simulate_qwen_response(messages: List[ChatMessage]) -> str:
         )
 
     # 4. Check for RAG context
-    if "السياق المسترجع من اللوائح والسياسات الرسمية" in system_msg:
+    if "السياق المسترجع من اللوائح والسياسات الرسمية" in system_msg or "لوائح وسياسات الموارد البشرية الرسمية" in system_msg:
         context_parts = system_msg.split("=========================================")
         if len(context_parts) >= 3:
             actual_context = context_parts[1].strip()

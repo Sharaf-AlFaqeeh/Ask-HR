@@ -86,7 +86,7 @@ class OpenAICompatibleLLMClient(ILLMClient):
                 content = msg.get("content", "")
                 if "expert NLP parser" in content:
                     is_nlp_parser = True
-                if "السياق المسترجع" in content or "RAG" in content:
+                if "السياق المسترجع" in content or "RAG" in content or "لوائح وسياسات" in content:
                     is_rag_query = True
         return self._fallback_reply(messages[-1]["content"], is_nlp_parser=is_nlp_parser, is_rag_query=is_rag_query)
 
@@ -173,7 +173,7 @@ class OpenAICompatibleLLMClient(ILLMClient):
                 content = msg.get("content", "")
                 if "expert NLP parser" in content:
                     is_nlp_parser = True
-                if "السياق المسترجع" in content or "RAG" in content:
+                if "السياق المسترجع" in content or "RAG" in content or "لوائح وسياسات" in content:
                     is_rag_query = True
                     
         fallback_text = self._fallback_reply(messages[-1]["content"], is_nlp_parser=is_nlp_parser, is_rag_query=is_rag_query)
@@ -199,7 +199,7 @@ class OpenAICompatibleLLMClient(ILLMClient):
                 "⚠️ [النظام: خادم الاستدلال غير متوفر - يتم عرض المرجع مباشرة].\n"
                 "مرحباً بك! نظراً لأن خادم الذكاء الاصطناعي (LLM) غير متصل حالياً، "
                 "فقد قمنا بجلب النصوص المباشرة من السياسات واللوائح الرسمية لك.\n\n"
-                "يرجى الاطلاع على قسم **المراجع المسترجعة** أدناه لقراءة نصوص السياسة الموثقة."
+                "يرجى الاطلاع على قسم **المراجع المرفقة** أدناه لقراءة نصوص السياسة الموثقة."
             )
 
         q = user_query.lower()
