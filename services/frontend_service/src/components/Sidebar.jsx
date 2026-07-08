@@ -50,7 +50,12 @@ export default function Sidebar() {
         <div style={{ padding: '0 0.5rem', marginBottom: '0.75rem' }}>
           <button 
             className="sidebar-new-chat-btn" 
-            onClick={startNewSession}
+            onClick={() => {
+              startNewSession();
+              if (window.innerWidth <= 768) {
+                toggleSidebar();
+              }
+            }}
           >
             <i className="fa-solid fa-plus"></i>
             محادثة جديدة
@@ -71,6 +76,9 @@ export default function Sidebar() {
                   if (sessionId !== s.session_id) {
                     loadSession(s.session_id);
                     switchView('assistant');
+                    if (window.innerWidth <= 768) {
+                      toggleSidebar();
+                    }
                   }
                 }}
               >

@@ -213,9 +213,9 @@ class OpenAICompatibleLLMClient(ILLMClient):
             return (
                 "⚠️ [النظام: خادم الاستدلال غير متوفر].\n"
                 "كشف الراتب المسحوب بنجاح من SAP:\n"
-                "- الراتب الأساسي: 2500 USD\n"
-                "- بدل السكن: 625 USD\n"
-                "- صافي الراتب: 2975 USD"
+                "- الراتب الأساسي: xxxx USD\n"
+                "- بدل السكن: xxxx USD\n"
+                "- صافي الراتب: xxxx USD"
             )
         else:
             return (

@@ -12,6 +12,7 @@ export default function App() {
   const activeView = useAppStore((state) => state.activeView);
   const theme = useAppStore((state) => state.theme);
   const sidebarCollapsed = useAppStore((state) => state.sidebarCollapsed);
+  const toggleSidebar = useAppStore((state) => state.toggleSidebar);
   const authToken = useAppStore((state) => state.authToken);
   const fetchSessions = useChatStore((state) => state.fetchSessions);
 
@@ -51,6 +52,9 @@ export default function App() {
       </div>
 
       <div className={`app-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        {!sidebarCollapsed && (
+          <div className="sidebar-backdrop" onClick={toggleSidebar}></div>
+        )}
         <Sidebar />
 
         <div className="main-content">

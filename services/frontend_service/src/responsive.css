@@ -1,6 +1,6 @@
 /* AskHR Enterprise Premium Design System - Responsive & Mobile Layout Styles */
 
-/* ================= BENTO GRID RESPONSIVENESS ================= */
+/* BENTO GRID RESPONSIVENESS */
 @media (max-width: 900px) {
     .bento-grid-3 {
         grid-template-columns: 1fr;
@@ -10,7 +10,7 @@
     }
 }
 
-/* ================= CHAT VIEW RESPONSIVENESS ================= */
+/* CHAT VIEW RESPONSIVENESS */
 @media (max-width: 600px) {
     .suggested-grid {
         grid-template-columns: 1fr;
@@ -23,7 +23,7 @@
     }
 }
 
-/* ================= TOP HEADER RESPONSIVENESS ================= */
+/* TOP HEADER RESPONSIVENESS */
 @media (max-width: 1440px) {
     .search-container {
         width: 260px;
@@ -133,5 +133,75 @@
     }
     .header-tabs {
         max-width: 160px;
+    }
+}
+
+/* MOBILE SIDEBAR DRAWER OVERLAY */
+.sidebar-backdrop {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .app-layout {
+        grid-template-columns: 1fr !important;
+    }
+    body[dir="rtl"] .app-layout {
+        grid-template-columns: 1fr !important;
+    }
+    .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        z-index: 1000;
+        width: 240px;
+        box-shadow: 0 0 24px rgba(0, 0, 0, 0.65);
+        height: 100vh;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    
+    /* Support sliding in LTR and RTL appropriately */
+    body[dir="ltr"] .sidebar {
+        left: 0;
+        right: auto;
+        transform: translateX(0);
+        border-right: 1px solid var(--border-color) !important;
+        border-left: none !important;
+    }
+    body[dir="ltr"] .sidebar-collapsed .sidebar {
+        transform: translateX(-100%);
+        opacity: 0;
+        pointer-events: none;
+    }
+    
+    body[dir="rtl"] .sidebar {
+        right: 0;
+        left: auto;
+        transform: translateX(0);
+        border-left: 1px solid var(--border-color) !important;
+        border-right: none !important;
+    }
+    body[dir="rtl"] .sidebar-collapsed .sidebar {
+        transform: translateX(100%);
+        opacity: 0;
+        pointer-events: none;
+    }
+    
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background-color: rgba(3, 4, 7, 0.75);
+        z-index: 999;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        transition: opacity 0.3s ease;
+    }
+    
+    /* Optimize chat messages and input panel padding for more horizontal space */
+    .chat-messages {
+        padding: 1.5rem 1rem !important;
+    }
+    .chat-input-panel {
+        padding: 0.85rem 1rem 0.7rem !important;
     }
 }
