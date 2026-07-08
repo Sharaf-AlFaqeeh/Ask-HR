@@ -79,18 +79,26 @@ _settings: Optional[EnterpriseSettings] = None
 def load_settings(config_path: str = "config.yaml") -> EnterpriseSettings:
     """
     Loads config.yaml, maps it, and applies environment variable overrides.
+    Ensures relative paths are resolved absolutely relative to the project root.
     """
     global _settings
     
-    yaml_data: Dict[str, Any] = {}
-    path = Path(config_path)
+    # Calculate Project Root (config_manager.py is in <root>/core/config_manager.py)
+    project_root = Path(__file__).resolve().parent.parent
     
+    yaml_data: Dict[str, Any] = {}
+    
+    # Locate config.yaml absolutely if a relative path was provided
+    path = Path(config_path)
+    if not path.is_absolute():
+        path = project_root / config_path
+        
     if path.exists():
         try:
             with open(path, "r", encoding="utf-8") as f:
                 yaml_data = yaml.safe_load(f) or {}
         except Exception as e:
-            print(f"Warning: Failed to load {config_path}: {e}")
+            print(f"Warning: Failed to load {path}: {e}")
             
     # Apply direct overrides from environment variables if present
     app_env = os.getenv("APP_ENV")
@@ -137,6 +145,17 @@ def load_settings(config_path: str = "config.yaml") -> EnterpriseSettings:
     redis_password = os.getenv("REDIS_PASSWORD")
     if redis_password:
         yaml_data.setdefault("storage", {}).setdefault("redis", {})["password"] = redis_password
+
+    # Resolve relative storage_path and model_path relative to project_root
+    vector_db_config = yaml_data.setdefault("vector_db", {})
+    storage_path_val = vector_db_config.get("storage_path", "services/vector_db_service/local_qdrant_db")
+    if not Path(storage_path_val).is_absolute():
+        vector_db_config["storage_path"] = str((project_root / storage_path_val).resolve())
+
+    llm_config = yaml_data.setdefault("llm", {})
+    model_path_val = llm_config.get("model_path", "services/llm_inference_service/models/qwen2.5-7b-instruct-q4_k_m.gguf")
+    if not Path(model_path_val).is_absolute():
+        llm_config["model_path"] = str((project_root / model_path_val).resolve())
 
     # Load with pydantic-settings (Environment variables override YAML settings)
     _settings = EnterpriseSettings(
