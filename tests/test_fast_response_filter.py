@@ -67,3 +67,117 @@ def test_fast_response_new_greetings():
     assert filter_service.match("ما عملك") is not None
     assert filter_service.match("عيد مبارك") is not None
 
+
+# ─────────────── English Greeting Tests ───────────────
+
+def test_english_basic_greetings():
+    filter_service = FastResponseFilter()
+    
+    # Basic greetings
+    assert filter_service.match("Hello") is not None
+    assert filter_service.match("Hi") is not None
+    assert filter_service.match("Hey") is not None
+    assert filter_service.match("hey there") is not None
+    assert filter_service.match("Greetings") is not None
+    assert filter_service.match("Howdy") is not None
+
+
+def test_english_time_of_day_greetings():
+    filter_service = FastResponseFilter()
+    
+    assert filter_service.match("Good morning") is not None
+    assert filter_service.match("Morning") is not None
+    assert filter_service.match("Good afternoon") is not None
+    assert filter_service.match("Good evening") is not None
+    assert filter_service.match("Good night") is not None
+
+
+def test_english_how_are_you():
+    filter_service = FastResponseFilter()
+    
+    assert filter_service.match("How are you?") is not None
+    assert filter_service.match("how are you doing") is not None
+    assert filter_service.match("How is it going?") is not None
+    assert filter_service.match("Whats up") is not None
+
+
+def test_english_identity_questions():
+    filter_service = FastResponseFilter()
+    
+    assert filter_service.match("Who are you?") is not None
+    assert filter_service.match("What do you do?") is not None
+    assert filter_service.match("What is your job?") is not None
+    assert filter_service.match("What can you do?") is not None
+    assert filter_service.match("What is this system?") is not None
+    assert filter_service.match("How can you help me?") is not None
+
+
+def test_english_thanks():
+    filter_service = FastResponseFilter()
+    
+    assert filter_service.match("Thank you") is not None
+    assert filter_service.match("Thanks") is not None
+    assert filter_service.match("Thanks a lot!") is not None
+    assert filter_service.match("Thank you so much!") is not None
+    assert filter_service.match("Appreciate it") is not None
+    assert filter_service.match("Much appreciated") is not None
+
+
+def test_english_holiday_greetings():
+    filter_service = FastResponseFilter()
+    
+    assert filter_service.match("Happy New Year!") is not None
+    assert filter_service.match("Merry Christmas") is not None
+    assert filter_service.match("Happy holidays") is not None
+    assert filter_service.match("Happy Eid") is not None
+    assert filter_service.match("Eid Mubarak") is not None
+    assert filter_service.match("Ramadan Mubarak") is not None
+    assert filter_service.match("Ramadan Kareem") is not None
+
+
+def test_english_farewell():
+    filter_service = FastResponseFilter()
+    
+    assert filter_service.match("Bye") is not None
+    assert filter_service.match("Goodbye") is not None
+    assert filter_service.match("See you") is not None
+    assert filter_service.match("Take care") is not None
+
+
+def test_english_normalization():
+    filter_service = FastResponseFilter()
+    
+    # Test case insensitivity
+    assert filter_service.match("HELLO") is not None
+    assert filter_service.match("hElLo") is not None
+    
+    # Test punctuation stripping
+    assert filter_service.match("Hello!!") is not None
+    assert filter_service.match("Thank you!!!") is not None
+    assert filter_service.match("How are you??") is not None
+    assert filter_service.match("Good morning!") is not None
+    
+    # Test extra whitespace
+    assert filter_service.match("  hello  ") is not None
+
+
+def test_english_no_match():
+    filter_service = FastResponseFilter()
+    
+    # Normal English HR queries should NOT match
+    assert filter_service.match("What is the annual leave policy?") is None
+    assert filter_service.match("I want to request a leave") is None
+    assert filter_service.match("Show me my salary slip") is None
+
+
+def test_english_response_randomness():
+    filter_service = FastResponseFilter()
+    
+    # Call match many times to ensure we hit different random responses
+    responses = set()
+    for _ in range(50):
+        res = filter_service.match("Hello")
+        responses.add(res)
+    
+    # Since there are 3 predefined responses for "hello", we should see more than 1 distinct response
+    assert len(responses) > 1

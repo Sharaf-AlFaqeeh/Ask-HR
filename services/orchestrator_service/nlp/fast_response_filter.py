@@ -44,10 +44,15 @@ class FastResponseFilter:
     Independent filtering system that intercepts user queries immediately upon arrival.
     If the query matches predefined greetings or simple FAQ patterns, it returns a 
     randomly selected appropriate response, bypassing RAG/LLM pipelines.
+    
+    Responses are separated into language-specific dictionaries (_arabic_responses
+    and _english_responses) so that the match logic can skip irrelevant entries
+    based on a quick language detection heuristic.
     """
     def __init__(self):
-        # Keys are pre-normalized for direct mapping comparison
-        self.predefined_responses: Dict[str, List[str]] = {
+        # ─────────────── Arabic Responses ───────────────
+        # Keys are pre-normalized Arabic text for direct mapping comparison
+        self._arabic_responses: Dict[str, List[str]] = {
             "السلام عليكم": [
                 "وعليكم السلام ورحمة الله وبركاته! كيف يمكنني مساعدتك اليوم؟ 😊",
                 "وعليكم السلام ورحمة الله وبركاته. أهلاً بك في AskHR، كيف يمكنني خدمتك؟",
@@ -191,22 +196,245 @@ class FastResponseFilter:
             ]
         }
 
+        # ─────────────── English Responses ───────────────
+        # Keys are lowercase, punctuation-free English text
+        self._english_responses: Dict[str, List[str]] = {
+            # Basic greetings
+            "hello": [
+                "Hello! Welcome to AskHR. How can I help you today? 😊",
+                "Hi there! How can I assist you with your HR inquiry?",
+                "Hello and welcome! I'm your AskHR assistant. What can I do for you today?"
+            ],
+            "hi": [
+                "Hi! How can I help you today? 😊",
+                "Hi there! Welcome to AskHR. How can I assist you?",
+                "Hey! I'm here to help with any HR questions. What do you need?"
+            ],
+            "hey": [
+                "Hey! How can I help you today? 😊",
+                "Hey there! Welcome to AskHR. How can I assist you?",
+                "Hi! What can I do for you today?"
+            ],
+            "hey there": [
+                "Hey there! How can I help you today? 😊",
+                "Hello! Welcome to AskHR. What can I assist you with?",
+                "Hi! I'm here to help. What do you need?"
+            ],
+            "greetings": [
+                "Greetings! Welcome to AskHR. How can I assist you today? 😊",
+                "Hello and welcome! How may I help you?",
+                "Greetings! I'm here to help with your HR needs. What can I do for you?"
+            ],
+            "howdy": [
+                "Howdy! Welcome to AskHR. How can I help you today? 😊",
+                "Hey there! How can I assist you today?"
+            ],
+
+            # Time-of-day greetings
+            "good morning": [
+                "Good morning! Wishing you a wonderful day ahead. How can I help you today? ☀️",
+                "Good morning! Welcome to AskHR. How may I assist you?",
+                "Morning! Hope you're having a great start to your day. How can I help? ☀️"
+            ],
+            "morning": [
+                "Good morning! How can I assist you today? ☀️",
+                "Morning! Wishing you a great day. How can I help?"
+            ],
+            "good afternoon": [
+                "Good afternoon! How can I help you today? 😊",
+                "Good afternoon! Welcome to AskHR. How may I assist you?"
+            ],
+            "good evening": [
+                "Good evening! How can I help you today? 🌙",
+                "Good evening! Welcome to AskHR. How may I assist you?",
+                "Good evening! I hope you've had a great day. How can I help? 🌙"
+            ],
+            "good night": [
+                "Good night! If you have any questions before you go, I'm happy to help 🌙",
+                "Good night! Feel free to come back anytime you need assistance."
+            ],
+
+            # How-are-you variants
+            "how are you": [
+                "I'm doing great, thank you for asking! How can I help you today with your HR needs? 😊",
+                "I'm doing well, thanks! How can I assist you today?"
+            ],
+            "how are you doing": [
+                "I'm doing great, thank you for asking! How can I assist you today? 😊",
+                "Doing well, thanks! What can I help you with?"
+            ],
+            "how is it going": [
+                "It's going well, thank you! How can I help you today? 😊",
+                "All good on my end! How can I assist you?"
+            ],
+            "whats up": [
+                "I'm here and ready to help! What can I do for you today? 😊",
+                "Not much, just ready to assist! What do you need help with?"
+            ],
+
+            # Identity / Role questions
+            "who are you": [
+                "I'm AskHRPro, the AI assistant for the HR and Shared Services department at HSA Group. How can I help you today? 😊",
+                "Welcome! I'm your digital HR expert (AskHRPro) from the HRIS and Shared Services division at HSA Group. How can I assist you?",
+                "I'm the HR expert for Hayel Saeed Anam Group (HSA Group). My role is to provide information and assistance regarding work policies, regulations, and employee-related procedures in coordination with Shared Services and HRIS. How can I help you today? 😊"
+            ],
+            "what do you do": [
+                "My role is to help you with your HR inquiries at HSA Group. Feel free to ask me anything! 👍",
+                "I assist you with HR policies, leave requests, salary slips, and employee-related procedures in coordination with the HRIS and Shared Services departments.",
+                "I'm here to make HR services at HSA Group more accessible. I can explain company policies, answer questions about salaries and allowances, and even help you submit leave requests in coordination with HRIS. How can I help you today? 😊"
+            ],
+            "what is your job": [
+                "My role is to help you with your HR inquiries at HSA Group. Feel free to ask me anything! 👍",
+                "I assist you with HR policies, leave requests, salary slips, and employee-related procedures in coordination with the HRIS and Shared Services departments."
+            ],
+            "what can you do": [
+                "I can help you with HR policies, leave requests, salary inquiries, and much more! Feel free to ask me anything. 😊",
+                "As your virtual HR assistant, I can save you time by searching HSA Group policies, helping you submit leave requests, and checking your monthly salary slip — all without needing to visit HR in person! 👍",
+                "I'm here to be your personal HR advisor at HSA Group. I can guide you through any administrative requirements, explain company policies, and even connect directly with SuccessFactors services like leave requests and salary slips in coordination with Shared Services and HRIS."
+            ],
+            "what is this system": [
+                "I'm AskHRPro, the AI assistant for the HR and Shared Services department at HSA Group. How can I help you today? 😊",
+                "Welcome! I'm your digital HR expert (AskHRPro) from the HRIS and Shared Services division at HSA Group. How can I assist you?",
+                "I'm the HR expert for Hayel Saeed Anam Group (HSA Group). My role is to provide information and assistance regarding work policies, regulations, and employee-related procedures in coordination with Shared Services and HRIS. How can I help you today? 😊"
+            ],
+            "how can you help me": [
+                "I can help you with HR policies, leave requests, salary inquiries, and much more! Feel free to ask me anything. 😊",
+                "As your virtual HR assistant, I can save you time by searching HSA Group policies, helping you submit leave requests, and checking your monthly salary slip — all without needing to visit HR in person! 👍",
+                "I'm here to be your personal HR advisor at HSA Group. I can guide you through any administrative requirements, explain company policies, and even connect directly with SuccessFactors services like leave requests and salary slips in coordination with Shared Services and HRIS."
+            ],
+
+            # Thanks & Appreciation
+            "thank you": [
+                "You're welcome! I'm always happy to help. 😊",
+                "My pleasure! Have a wonderful day! 👍",
+                "Anytime! If you have more questions, don't hesitate to ask."
+            ],
+            "thanks": [
+                "You're welcome! I'm always happy to help. 😊",
+                "My pleasure! Have a wonderful day! 👍",
+                "Anytime! If you have more questions, don't hesitate to ask."
+            ],
+            "thanks a lot": [
+                "You're very welcome! I'm always here to help. 😊",
+                "Glad I could help! Have a great day! 👍"
+            ],
+            "thank you so much": [
+                "You're very welcome! It's my pleasure to assist. 😊",
+                "Glad I could help! Don't hesitate to reach out if you need anything else. 👍"
+            ],
+            "appreciate it": [
+                "You're welcome! Happy to help. 😊",
+                "Glad I could assist! Let me know if you need anything else."
+            ],
+            "much appreciated": [
+                "You're welcome! I'm always happy to help. 😊",
+                "My pleasure! Don't hesitate to reach out anytime."
+            ],
+
+            # Holiday & Seasonal greetings
+            "happy new year": [
+                "Happy New Year to you too! Wishing you a year full of success and happiness. 🎉 How can I help you today?",
+                "Happy New Year! May this year bring you prosperity and joy. How can I assist you? 🎊"
+            ],
+            "merry christmas": [
+                "Merry Christmas to you too! Wishing you a joyful holiday season. 🎄 How can I help you today?",
+                "Merry Christmas! Hope you enjoy the festivities. How can I assist you? 🎅"
+            ],
+            "happy holidays": [
+                "Happy holidays to you too! Wishing you a wonderful time. 🎉 How can I help you today?",
+                "Happy holidays! Hope you're enjoying the season. How can I assist you? 😊"
+            ],
+            "happy eid": [
+                "Happy Eid to you too! May it be filled with blessings and joy. 🌸 How can I help you today?",
+                "Eid Mubarak! Wishing you and your family a blessed celebration. How can I assist you? 😊"
+            ],
+            "eid mubarak": [
+                "Eid Mubarak to you too! May this Eid bring you happiness and peace. 🌸 How can I help you today?",
+                "Eid Mubarak! Wishing you and your loved ones a blessed and joyful Eid. How can I assist you? 😊"
+            ],
+            "ramadan mubarak": [
+                "Ramadan Mubarak! Wishing you a blessed and peaceful Ramadan. 🌙 How can I help you today?",
+                "Ramadan Mubarak to you too! May this holy month bring you peace and blessings. How can I assist you? 😊"
+            ],
+            "ramadan kareem": [
+                "Ramadan Kareem! Wishing you a blessed and generous Ramadan. 🌙 How can I help you today?",
+                "Ramadan Kareem! May this holy month be full of blessings for you and your family. How can I assist you? 😊"
+            ],
+
+            # Farewell / Goodbye
+            "bye": [
+                "Goodbye! Have a great day. Feel free to come back anytime! 👋",
+                "Bye! Wishing you all the best. Don't hesitate to reach out if you need anything! 😊"
+            ],
+            "goodbye": [
+                "Goodbye! It was great helping you. Have a wonderful day! 👋",
+                "Goodbye! Feel free to come back anytime you need assistance. 😊"
+            ],
+            "see you": [
+                "See you! Have a great day ahead! 👋",
+                "See you later! Don't hesitate to come back anytime. 😊"
+            ],
+            "take care": [
+                "You too! Take care and have a wonderful day! 😊",
+                "Take care! I'm always here if you need help. 👋"
+            ]
+        }
+
+        # Backward-compatible unified view (read-only convenience for tests)
+        self.predefined_responses: Dict[str, List[str]] = {
+            **self._arabic_responses,
+            **self._english_responses
+        }
+
+    @staticmethod
+    def _normalize_english(text: str) -> str:
+        """
+        Lightweight normalization for English text:
+        - Lowercase
+        - Strip punctuation and special characters
+        - Collapse whitespace
+        """
+        text = text.lower()
+        text = re.sub(r"[?!.,;:'\"\-_()\[\]{}/@#$%^&*~`]", " ", text)
+        text = re.sub(r"\s+", " ", text)
+        return text.strip()
+
+    @staticmethod
+    def _is_english(text: str) -> bool:
+        """
+        Heuristic language detection: if the majority of alphabetic characters
+        in the text are ASCII, the query is treated as English.
+        """
+        ascii_letters = sum(1 for c in text if c.isascii() and c.isalpha())
+        total_letters = sum(1 for c in text if c.isalpha())
+        if total_letters == 0:
+            return False
+        return (ascii_letters / total_letters) > 0.5
+
     def match(self, query: str) -> Optional[str]:
         """
-        Intercepts the user query, normalizes it, and checks if it matches any of the
-        predefined greetings or FAQs.
+        Intercepts the user query. Detects the language first, then searches
+        only in the language-specific dictionary with the appropriate normalizer.
         Returns a random matching response, or None if no match is found.
         """
         if not query:
             return None
         
-        normalized = normalize_arabic(query)
-        logger.debug(f"Normalized query: '{query}' -> '{normalized}'")
-        
-        responses = self.predefined_responses.get(normalized)
+        if self._is_english(query):
+            # ── English path ──
+            normalized = self._normalize_english(query)
+            logger.debug(f"English normalized query: '{query}' -> '{normalized}'")
+            responses = self._english_responses.get(normalized)
+        else:
+            # ── Arabic path ──
+            normalized = normalize_arabic(query)
+            logger.debug(f"Arabic normalized query: '{query}' -> '{normalized}'")
+            responses = self._arabic_responses.get(normalized)
+
         if responses:
             chosen = random.choice(responses)
             logger.info(f"FastResponseFilter matched query: '{query}' with response: '{chosen}'")
             return chosen
             
         return None
+
