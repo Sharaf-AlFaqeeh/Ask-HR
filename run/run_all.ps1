@@ -6,6 +6,10 @@
 # Stop all 
 # taskkill /F /IM python.exe
 
+
+# cloudeflare 
+# C:\cloudflared.exe tunnel --url http://127.0.0.1:8082
+
 Clear-Host
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host "      AskHR Enterprise AI System Launcher         " -ForegroundColor Cyan
