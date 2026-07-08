@@ -2,6 +2,7 @@
 import os
 import sys
 import re
+import unicodedata
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -33,6 +34,19 @@ def normalize_name(name: str) -> str:
     # Remove punctuation
     name = re.sub(r'[^\w\s]', '', name)
     return name
+
+def normalize_arabic_text(text: str) -> str:
+    """
+    Normalizes Arabic Presentation Forms (U+FB50-U+FDFF, U+FE70-U+FEFF) back to
+    standard Arabic characters (U+0600-U+06FF) using Unicode NFKC decomposition.
+    
+    This fixes garbled text from PDF extraction where Arabic characters are stored
+    in their positional presentation forms instead of standard logical form.
+    Example: 'ﺳﻴﺎﺳﺔ' -> 'سياسة'
+    """
+    # NFKC normalization decomposes presentation forms to standard characters
+    normalized = unicodedata.normalize('NFKC', text)
+    return normalized
 
 def ingest_documents() -> None:
     """
@@ -88,6 +102,9 @@ def ingest_documents() -> None:
                     page_text = match[1].strip()
                     # Strip markdown page title if present (e.g. ## صفحة X)
                     page_text = re.sub(r'^##\s+صفحة\s+\d+\s*\n*', '', page_text).strip()
+                    
+                    # Normalize Arabic Presentation Forms to standard Arabic
+                    page_text = normalize_arabic_text(page_text)
                     
                     if page_text:
                         pages_data.append({
