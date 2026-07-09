@@ -241,7 +241,9 @@ export const useChatStore = create((set, get) => ({
                     if (data.action_payload) {
                       pendingAction = data.action_payload;
                       currentMsg.actionWidget = pendingAction;
-                      set({ activePendingAction: pendingAction });
+                      if (pendingAction.action_type === 'TRANSACTIONAL') {
+                        set({ activePendingAction: pendingAction });
+                      }
                       appStore.addConsoleLog(`تم تلقي قالب واجهة تفاعلي: ${pendingAction.action_id}`, 'info');
                     }
 

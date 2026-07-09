@@ -11,20 +11,20 @@ function isEnglishText(text) {
 // Helper to parse inline markdown patterns (bold, italic, code, links)
 function parseInlineMarkdown(text) {
   if (!text) return '';
-  
+
   const pattern = /(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))/g;
   const tokens = [];
   let lastIndex = 0;
   let key = 0;
-  
+
   let match;
   while ((match = pattern.exec(text)) !== null) {
     const matchIndex = match.index;
-    
+
     if (matchIndex > lastIndex) {
       tokens.push(text.substring(lastIndex, matchIndex));
     }
-    
+
     if (match[1]) {
       tokens.push(<strong key={key++} className="md-bold">{match[2]}</strong>);
     } else if (match[3]) {
@@ -38,14 +38,14 @@ function parseInlineMarkdown(text) {
         </a>
       );
     }
-    
+
     lastIndex = pattern.lastIndex;
   }
-  
+
   if (lastIndex < text.length) {
     tokens.push(text.substring(lastIndex));
   }
-  
+
   return tokens.length > 0 ? tokens : text;
 }
 
@@ -236,15 +236,15 @@ function appendCursor(blocks, cursorKey) {
   if (!blocks || blocks.length === 0) {
     return [<span key={cursorKey} className="cursor-blink"></span>];
   }
-  
+
   const lastIndex = blocks.length - 1;
   const lastBlock = blocks[lastIndex];
   const cursor = <span key={cursorKey} className="cursor-blink"></span>;
-  
+
   if (React.isValidElement(lastBlock)) {
     const children = lastBlock.props.children;
     let newChildren;
-    
+
     if (children === undefined || children === null) {
       newChildren = cursor;
     } else if (Array.isArray(children)) {
@@ -268,14 +268,70 @@ function appendCursor(blocks, cursorKey) {
         </React.Fragment>
       );
     }
-    
+
     const clonedBlock = React.cloneElement(lastBlock, {}, newChildren);
     const updatedBlocks = [...blocks];
     updatedBlocks[lastIndex] = clonedBlock;
     return updatedBlocks;
   }
-  
+
   return [...blocks, cursor];
+}
+
+// Reusable Thinking & Analyzing Indicator Component
+function ThinkingIndicator({ text, color = 'gold', showIcon = true }) {
+  const isEng = isEnglishText(text);
+  let dotBg = 'linear-gradient(135deg, var(--hsa-gold), var(--hsa-gold-dark))';
+  let textColor = 'var(--text-muted)';
+  let iconClass = 'fa-solid fa-wand-magic-sparkles';
+  let iconStyle = { color: 'var(--hsa-gold)', fontSize: '0.85rem' };
+  let indicatorStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '0.4rem 0.8rem',
+    borderRadius: '12px',
+    background: 'rgba(255, 255, 255, 0.03)',
+    border: '1px solid rgba(255, 255, 255, 0.05)',
+    direction: isEng ? 'ltr' : 'rtl',
+    height: 'auto',
+    marginBottom: '0.5rem'
+  };
+
+  if (color === 'blue') {
+    dotBg = 'linear-gradient(135deg, #38bdf8, #0284c7)';
+    textColor = '#38bdf8';
+    iconClass = 'fa-solid fa-gears fa-spin';
+    iconStyle = { color: '#38bdf8', fontSize: '0.85rem' };
+    indicatorStyle.background = 'rgba(56, 189, 248, 0.04)';
+    indicatorStyle.borderColor = 'rgba(56, 189, 248, 0.12)';
+  } else if (color === 'gold') {
+    dotBg = 'linear-gradient(135deg, var(--hsa-gold), var(--hsa-gold-dark))';
+    textColor = 'var(--hsa-gold)';
+    iconClass = 'fa-solid fa-wand-magic-sparkles fa-bounce';
+    iconStyle = { color: 'var(--hsa-gold)', fontSize: '0.85rem' };
+    indicatorStyle.background = 'rgba(212, 175, 55, 0.04)';
+    indicatorStyle.borderColor = 'rgba(212, 175, 55, 0.12)';
+  } else {
+    dotBg = color;
+    textColor = color;
+    iconClass = 'fa-solid fa-spinner fa-spin';
+    iconStyle = { color: color, fontSize: '0.85rem' };
+  }
+
+  return (
+    <div className="typing-indicator animate-fade-in" style={indicatorStyle}>
+      {showIcon && <i className={iconClass} style={iconStyle} />}
+      <span style={{ fontSize: '0.82rem', color: textColor, fontWeight: '600' }}>
+        {text}
+      </span>
+      <div style={{ display: 'flex', gap: '4px', [isEng ? 'marginLeft' : 'marginRight']: '4px' }}>
+        <div className="typing-dot" style={{ background: dotBg, width: '6px', height: '6px' }} />
+        <div className="typing-dot" style={{ background: dotBg, width: '6px', height: '6px' }} />
+        <div className="typing-dot" style={{ background: dotBg, width: '6px', height: '6px' }} />
+      </div>
+    </div>
+  );
 }
 
 // Stateful Loading Card for INQUIRY Actions (like payslip)
@@ -505,24 +561,24 @@ function LeaveRequestForm({ formData, onSubmit, onCancel }) {
         >
           {isSubmitting ? 'جاري الإرسال...' : 'إرسال الطلب'}
         </button>
-      <button
-        className="leave-form-cancel"
-        onClick={onCancel}
-        disabled={isSubmitting}
-        style={{
-          flex: 1,
-          background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          color: 'var(--text-secondary)',
-          borderRadius: '8px',
-          padding: '8px 12px',
-          fontSize: '0.85rem',
-          cursor: 'pointer'
-        }}
-      >
-        إلغاء
-      </button>
-    </div>
+        <button
+          className="leave-form-cancel"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          style={{
+            flex: 1,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            color: 'var(--text-secondary)',
+            borderRadius: '8px',
+            padding: '8px 12px',
+            fontSize: '0.85rem',
+            cursor: 'pointer'
+          }}
+        >
+          إلغاء
+        </button>
+      </div>
     </div >
   );
 }
@@ -622,7 +678,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
             hasInitializedThinkingText = true;
             thinkingCharIdx = 0;
           }
-          
+
           if (thinkingCharIdx < targetThinkingText.length) {
             const nextText = targetThinkingText.substring(0, thinkingCharIdx + 1);
             setThinkingText(nextText);
@@ -634,8 +690,9 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
 
         // 2a. If citations exist, format and type the detailed thinking header
         const docSources = Array.from(new Set(state.citations.map(c => c.source)));
-        const expectedDetailedText = `جاري مراجعة وتحليل لوائح السياسات المسترجعة من مستند [${docSources.join(', ')}]...`;
-        
+        // const expectedDetailedText = `جاري مراجعة وتحليل لوائح السياسات المسترجعة من مستند [${docSources.join(', ')}]...`;
+        const expectedDetailedText = `Analyzing`;
+
         if (!hasInitializedThinkingText || targetThinkingText !== expectedDetailedText) {
           targetThinkingText = expectedDetailedText;
           hasInitializedThinkingText = true;
@@ -741,9 +798,15 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
           {isThinkingExpanded && (
             <div className="thinking-process-content" style={{ marginTop: '0.4rem', padding: '0.6rem 0.8rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.12)', border: '1px solid rgba(255,255,255,0.03)' }}>
               {/* Simulated typing status */}
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', opacity: 0.9, fontStyle: 'italic', marginBottom: '0.5rem', direction: 'rtl', textAlign: 'right' }}>
-                {thinkingText}
-                {!isThinkingDone && <span className="cursor-blink"></span>}
+              <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', direction: 'rtl' }}>
+                {!isThinkingDone ? (
+                  <ThinkingIndicator text={thinkingText} color="blue" />
+                ) : (
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', opacity: 0.7, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <i className="fa-solid fa-circle-check" style={{ color: 'var(--success)', fontSize: '0.85rem' }} />
+                    <span>{thinkingText}</span>
+                  </div>
+                )}
               </div>
 
               {/* Citations references */}
@@ -778,13 +841,13 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
 
       {/* 💬 Actual Bot Message Text */}
       {inquiryShowText && (displayedText || isThinkingDone) && (
-        <div 
-          style={{ 
-            fontSize: '0.92rem', 
-            lineHeight: '1.7', 
-            textAlign: isEnglishText(displayedText) ? 'left' : 'right', 
-            direction: isEnglishText(displayedText) ? 'ltr' : 'rtl' 
-          }} 
+        <div
+          style={{
+            fontSize: '0.92rem',
+            lineHeight: '1.7',
+            textAlign: isEnglishText(displayedText) ? 'left' : 'right',
+            direction: isEnglishText(displayedText) ? 'ltr' : 'rtl'
+          }}
           className={`${isInquiry ? 'animate-fade-in' : ''} ${isEnglishText(displayedText) ? 'md-ltr' : ''}`}
         >
           {displayedText ? (
@@ -795,12 +858,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
             )
           ) : (
             !isTypingCompleted && (
-              <div className="typing-indicator" style={{ padding: '0.5rem 0', justifyContent: 'flex-start', direction: 'rtl', height: 'auto' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>جاري التحليل وصياغة الرد</span>
-                <div className="typing-dot" style={{ width: '6px', height: '6px', margin: '0 2px' }}></div>
-                <div className="typing-dot" style={{ width: '6px', height: '6px', margin: '0 2px' }}></div>
-                <div className="typing-dot" style={{ width: '6px', height: '6px', margin: '0 2px' }}></div>
-              </div>
+              <ThinkingIndicator text="Thinking" color="gold" />
             )
           )}
         </div>
@@ -1067,11 +1125,7 @@ export default function AssistantView() {
             <div className="message-wrapper bot">
               <div className="message-bubble-container" style={{ width: '100%' }}>
                 <div className="message-bubble">
-                  <div className="typing-indicator">يفكر
-                    <div className="typing-dot"></div>
-                    <div className="typing-dot"></div>
-                    <div className="typing-dot"></div>
-                  </div>
+                  <ThinkingIndicator text="يفكر" color="gold" />
                 </div>
               </div>
             </div>
