@@ -663,10 +663,15 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
         const targetResponseText = state.isStreamClosed ? state.rawTextTarget || state.rawTextBuffer : state.rawTextBuffer;
 
         if (responseCharIdx < targetResponseText.length) {
-          const nextText = targetResponseText.substring(0, responseCharIdx + 1);
+          const lag = targetResponseText.length - responseCharIdx;
+          // Dynamically adjust typing speed based on how far behind the stream we are
+          const increment = lag > 60 ? 6 : lag > 30 ? 3 : 1;
+          
+          const nextIndex = Math.min(responseCharIdx + increment, targetResponseText.length);
+          const nextText = targetResponseText.substring(0, nextIndex);
           setDisplayedText(nextText);
           state.displayedText = nextText;
-          responseCharIdx++;
+          responseCharIdx = nextIndex;
         } else if (state.isStreamClosed) {
           clearInterval(interval);
           setIsTypingCompleted(true);

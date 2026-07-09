@@ -12,14 +12,20 @@ class FeedbackFilter:
     """
     def __init__(self):
         # Acknowledgement / feedback terms
-        self._arabic_feedback = {
+        raw_arabic_feedback = {
+            "نعم", "شكرا", "شكرًا", "شكرا لك", "شكرًا لك", "تسلم", "تسلم دياتك", "يعطيك العافية", "يعطيك العافيه", 
+            "مشكور", "مشكور جدا", "جزاك الله خيرا", "جزاك الله خير", "نعم شكرا", "نعم شكرًا",
             "ممتاز", "احسنت", "اوكي", "ok", "تمام", "واضح", "جميل", "رائع", "موافق", "ماشي", "طيب", "حسنا",
-            "ممتاز جدا", "تمام شكرا", "واضح جدا", "جميل جدا", "رائع جدا", "حسنا شكرا"
+            "ممتاز جدا", "تمام شكرا", "واضح جدا", "جميل جدا", "رائع جدا", "حسنا شكرا", "واضح شكرا", "واضح شكرًا"
         }
-        self._english_feedback = {
+        self._arabic_feedback = {normalize_arabic(f) for f in raw_arabic_feedback}
+
+        raw_english_feedback = {
             "ok", "okay", "perfect", "great", "awesome", "well done", "nice", "cool", "got it", "clear",
-            "thank you", "thanks"
+            "thank you", "thanks", "yes", "yes thank you", "yes thanks", "yep", "yeah", "correct", "indeed",
+            "sure", "right", "thank you so much", "thanks a lot"
         }
+        self._english_feedback = {FastResponseFilter._normalize_english(f) for f in raw_english_feedback}
 
         self._arabic_responses = [
             "يسعدني أن الأمور واضحة لك! هل هناك أي شيء آخر يمكنني مساعدتك به؟ 😊",
@@ -33,13 +39,17 @@ class FeedbackFilter:
         ]
 
         # General question particles
-        self._arabic_particles = {
-            "لماذا", "كيف", "متى", "اين", "من", "شروطها", "وضح", "تفاصيل", "ماذا تعني", "ما المعنى", 
-            "لماذا ذلك", "كيف ذلك", "وشروطها", "تفاصيلها"
+        raw_arabic_particles = {
+            "لم افهم","لماذا", "ما فهمت","مافهمت","لم أفهم","كيف", "متى", "اين", "من", "شروطها", "بين", "وضح", "تفاصيل", "ماذا تعني", "ما المعنى", 
+            "لماذا ذلك", "كيف ذلك", "وشروطها", "تفاصيلها","بينها","وضحها", "وضح اكثر", "وضح ذلك", "ما السبب", "ما سبب"
         }
-        self._english_particles = {
-            "why", "how", "when", "where", "who", "details", "explain", "what does it mean", "what do you mean"
+        self._arabic_particles = {normalize_arabic(p) for p in raw_arabic_particles}
+
+        raw_english_particles = {
+            "why", "how", "when", "where", "who", "details", "explain", "what does it mean", "what do you mean",
+            "why is that", "explain more", "explain that"
         }
+        self._english_particles = {FastResponseFilter._normalize_english(p) for p in raw_english_particles}
 
     def match_feedback(self, query: str, history: Optional[List[Any]] = None) -> Optional[str]:
         """
@@ -83,7 +93,8 @@ class FeedbackFilter:
 
     def match_followup(self, query: str, history: List[Any]) -> Optional[str]:
         """
-        Detects if the query keyword/value exists in the last assistant response.
+        Detects if the query keyword/value exists in the last assistant response,
+        or matches a general question/follow-up particle.
         If so, returns a reformulated/enriched query contextually.
         """
         if not query or not history:
@@ -115,14 +126,15 @@ class FeedbackFilter:
             norm_query = normalize_arabic(clean_query)
             norm_assistant = normalize_arabic(last_assistant_msg)
 
-        # 4. Check if the query exists in the last assistant response
+        # 4. Check if the query matches a particle or exists in the last assistant response
         is_keyword_match = len(norm_query) >= 2 and norm_query in norm_assistant
+        is_particle_match = norm_query in (self._english_particles if is_en else self._arabic_particles)
 
-        if not is_keyword_match:
+        if not (is_keyword_match or is_particle_match):
             return None
 
         # 5. Formulate rewritten query using last assistant response (first 250 chars) as context
-        logger.info(f"FeedbackFilter detected contextual follow-up: query='{query}' matched last response.")
+        logger.info(f"FeedbackFilter detected contextual follow-up: query='{query}', is_keyword={is_keyword_match}, is_particle={is_particle_match}")
         
         context_snippet = last_assistant_msg[:250].strip()
         # Add ellipsis if truncated
