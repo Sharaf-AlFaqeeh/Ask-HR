@@ -3188,3 +3188,246 @@ body.light-theme .citation-link:hover {
     direction: rtl;
 }
 
+/* --- Markdown Elements Styling (Premium Dark Mode) --- */
+.md-bold {
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.md-italic {
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+.md-code {
+    font-family: var(--font-numeric), monospace;
+    background-color: rgba(255, 255, 255, 0.08);
+    padding: 0.15rem 0.35rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: 0.85em;
+    color: var(--hsa-gold);
+}
+
+.md-link {
+    color: var(--hsa-gold);
+    text-decoration: underline;
+    transition: var(--transition-smooth);
+}
+
+.md-link:hover {
+    color: #ffffff;
+    text-decoration: none;
+}
+
+/* Headers */
+.md-header {
+    margin: 1.25rem 0 0.6rem 0;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.4;
+    direction: rtl;
+    text-align: right;
+}
+
+.md-h1 {
+    font-size: 1.15rem;
+    color: var(--hsa-gold);
+    border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+    padding-bottom: 0.35rem;
+}
+
+.md-h2 {
+    font-size: 1.05rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 0.25rem;
+}
+
+.md-h3 {
+    font-size: 0.98rem;
+}
+
+.md-h4, .md-h5, .md-h6 {
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+}
+
+/* Blockquotes */
+.md-blockquote {
+    border-right: 3px solid var(--hsa-gold);
+    border-left: none;
+    padding: 0.5rem 1rem;
+    margin: 0.75rem 0;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 0 6px 6px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+    direction: rtl;
+    text-align: right;
+}
+
+/* Lists */
+.md-ul, .md-ol {
+    margin: 0.75rem 0;
+    padding-right: 1.5rem;
+    padding-left: 0;
+    direction: rtl;
+    text-align: right;
+}
+
+.md-li {
+    margin-bottom: 0.35rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.md-ul .md-li {
+    list-style-type: square;
+}
+
+.md-ol .md-li {
+    list-style-type: decimal;
+}
+
+/* Paragraphs */
+.md-paragraph {
+    margin-bottom: 0.75rem;
+    line-height: 1.7;
+    direction: rtl;
+    text-align: right;
+}
+
+/* Tables (Highly styled & premium) */
+.md-table-container {
+    overflow-x: auto;
+    margin: 1rem 0;
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.15);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.md-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: right;
+    direction: rtl;
+}
+
+.md-table th {
+    background-color: rgba(212, 175, 55, 0.08);
+    color: var(--hsa-gold);
+    font-weight: 700;
+    padding: 0.7rem 0.9rem;
+    font-size: 0.85rem;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.18);
+    letter-spacing: 0.3px;
+}
+
+.md-table td {
+    padding: 0.7rem 0.9rem;
+    font-size: 0.85rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+    transition: background-color 0.2s ease;
+}
+
+.md-table tr:last-child td {
+    border-bottom: none;
+}
+
+.md-table tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.015);
+}
+
+.md-table tr:hover td {
+    background-color: rgba(255, 255, 255, 0.03);
+    color: #ffffff;
+}
+
+/* Theme compatibility styles for light mode */
+body.light-theme .md-bold {
+    color: #111827;
+}
+
+body.light-theme .md-code {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.08);
+    color: #b8860b;
+}
+
+body.light-theme .md-header {
+    color: #111827;
+}
+
+body.light-theme .md-blockquote {
+    background: rgba(0, 0, 0, 0.02);
+    color: #4b5563;
+}
+
+body.light-theme .md-li, 
+body.light-theme .md-paragraph {
+    color: #374151;
+}
+
+body.light-theme .md-table-container {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .md-table td {
+    color: #374151;
+    border-bottom-color: rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .md-table tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.01);
+}
+
+body.light-theme .md-table tr:hover td {
+    background-color: rgba(0, 0, 0, 0.02);
+    color: #111827;
+}
+
+/* --- LTR/English Layout Overrides --- */
+.md-ltr {
+    direction: ltr !important;
+    text-align: left !important;
+}
+
+.md-ltr .md-header {
+    direction: ltr;
+    text-align: left;
+}
+
+.md-ltr .md-blockquote {
+    border-left: 3px solid var(--hsa-gold);
+    border-right: none;
+    padding: 0.5rem 1rem;
+    direction: ltr;
+    text-align: left;
+    border-radius: 6px 0 0 6px;
+}
+
+.md-ltr .md-ul, .md-ltr .md-ol {
+    padding-left: 1.5rem;
+    padding-right: 0;
+    direction: ltr;
+    text-align: left;
+}
+
+.md-ltr .md-paragraph {
+    direction: ltr;
+    text-align: left;
+}
+
+.md-ltr .md-table {
+    text-align: left;
+    direction: ltr;
+}
+
+.md-ltr .md-table th {
+    text-align: left;
+}
+

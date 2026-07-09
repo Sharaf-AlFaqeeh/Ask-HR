@@ -1,6 +1,283 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChatStore } from '../store/useChatStore';
 
+// Helper to detect if text is predominantly English
+function isEnglishText(text) {
+  if (!text) return false;
+  const hasArabic = /[\u0600-\u06FF]/.test(text);
+  return !hasArabic;
+}
+
+// Helper to parse inline markdown patterns (bold, italic, code, links)
+function parseInlineMarkdown(text) {
+  if (!text) return '';
+  
+  const pattern = /(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))/g;
+  const tokens = [];
+  let lastIndex = 0;
+  let key = 0;
+  
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    const matchIndex = match.index;
+    
+    if (matchIndex > lastIndex) {
+      tokens.push(text.substring(lastIndex, matchIndex));
+    }
+    
+    if (match[1]) {
+      tokens.push(<strong key={key++} className="md-bold">{match[2]}</strong>);
+    } else if (match[3]) {
+      tokens.push(<em key={key++} className="md-italic">{match[4]}</em>);
+    } else if (match[5]) {
+      tokens.push(<code key={key++} className="md-code">{match[6]}</code>);
+    } else if (match[7]) {
+      tokens.push(
+        <a key={key++} href={match[9]} target="_blank" rel="noopener noreferrer" className="md-link">
+          {match[8]}
+        </a>
+      );
+    }
+    
+    lastIndex = pattern.lastIndex;
+  }
+  
+  if (lastIndex < text.length) {
+    tokens.push(text.substring(lastIndex));
+  }
+  
+  return tokens.length > 0 ? tokens : text;
+}
+
+// Render markdown blocks: tables, lists, headers, blockquotes, paragraphs
+function renderMarkdown(text) {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  const blocks = [];
+  let currentTable = null;
+  let currentList = null; // { type: 'ul' | 'ol', items: [] }
+  let currentParagraph = [];
+
+  const flushParagraph = (key) => {
+    if (currentParagraph.length > 0) {
+      blocks.push(
+        <p key={key} className="md-paragraph">
+          {currentParagraph.map((line, idx) => (
+            <React.Fragment key={idx}>
+              {idx > 0 && <br />}
+              {parseInlineMarkdown(line)}
+            </React.Fragment>
+          ))}
+        </p>
+      );
+      currentParagraph = [];
+    }
+  };
+
+  const flushTable = (key) => {
+    if (currentTable) {
+      const rows = currentTable.map(line => {
+        const cells = line.split('|').map(c => c.trim());
+        if (cells[0] === '') cells.shift();
+        if (cells[cells.length - 1] === '') cells.pop();
+        return cells;
+      });
+
+      let hasHeader = true;
+      let headerRow = rows[0] || [];
+      let bodyRows = rows.slice(1);
+
+      const isSeparator = (row) => row.every(cell => /^:?-+:?$/.test(cell));
+      if (rows[1] && isSeparator(rows[1])) {
+        bodyRows = rows.slice(2);
+      } else if (rows[0] && isSeparator(rows[0])) {
+        hasHeader = false;
+        bodyRows = rows.slice(1);
+      }
+
+      blocks.push(
+        <div key={key} className="md-table-container">
+          <table className="md-table">
+            {hasHeader && (
+              <thead>
+                <tr>
+                  {headerRow.map((cell, idx) => (
+                    <th key={idx}>{parseInlineMarkdown(cell)}</th>
+                  ))}
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {bodyRows.map((row, rowIdx) => (
+                <tr key={rowIdx}>
+                  {row.map((cell, cellIdx) => (
+                    <td key={cellIdx}>{parseInlineMarkdown(cell)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      currentTable = null;
+    }
+  };
+
+  const flushList = (key) => {
+    if (currentList) {
+      const Tag = currentList.type;
+      blocks.push(
+        <Tag key={key} className={currentList.type === 'ul' ? 'md-ul' : 'md-ol'}>
+          {currentList.items.map((item, idx) => (
+            <li key={idx} className="md-li">
+              {parseInlineMarkdown(item)}
+            </li>
+          ))}
+        </Tag>
+      );
+      currentList = null;
+    }
+  };
+
+  const flushAll = (key) => {
+    flushParagraph(key + '-p');
+    flushTable(key + '-t');
+    flushList(key + '-l');
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // 1. Table Row
+    const isTableRow = trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 1;
+    if (isTableRow) {
+      flushParagraph(i);
+      flushList(i);
+      if (!currentTable) currentTable = [];
+      currentTable.push(trimmed);
+      continue;
+    } else {
+      flushTable(i);
+    }
+
+    // 2. Unordered List Item
+    const ulMatch = line.match(/^(\s*)[-*]\s+(.*)$/);
+    if (ulMatch) {
+      flushParagraph(i);
+      flushTable(i);
+      if (!currentList || currentList.type !== 'ul') {
+        flushList(i);
+        currentList = { type: 'ul', items: [] };
+      }
+      currentList.items.push(ulMatch[2]);
+      continue;
+    }
+
+    // 3. Ordered List Item
+    const olMatch = line.match(/^(\s*)\d+\.\s+(.*)$/);
+    if (olMatch) {
+      flushParagraph(i);
+      flushTable(i);
+      if (!currentList || currentList.type !== 'ol') {
+        flushList(i);
+        currentList = { type: 'ol', items: [] };
+      }
+      currentList.items.push(olMatch[2]);
+      continue;
+    }
+
+    flushList(i);
+
+    // 4. Headers
+    const headerMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (headerMatch) {
+      flushParagraph(i);
+      const level = headerMatch[1].length;
+      const content = headerMatch[2];
+      const Tag = `h${Math.min(level + 2, 6)}`;
+      blocks.push(
+        <Tag key={i} className={`md-header md-h${level}`}>
+          {parseInlineMarkdown(content)}
+        </Tag>
+      );
+      continue;
+    }
+
+    // 5. Blockquotes
+    if (trimmed.startsWith('>')) {
+      flushParagraph(i);
+      const content = trimmed.substring(1).trim();
+      blocks.push(
+        <blockquote key={i} className="md-blockquote">
+          {parseInlineMarkdown(content)}
+        </blockquote>
+      );
+      continue;
+    }
+
+    // 6. Empty Line
+    if (trimmed === '') {
+      flushParagraph(i);
+      continue;
+    }
+
+    currentParagraph.push(line);
+  }
+
+  flushAll(lines.length);
+
+  return blocks;
+}
+
+// Appends typing cursor to the last text node in the parsed block structure
+function appendCursor(blocks, cursorKey) {
+  if (!blocks || blocks.length === 0) {
+    return [<span key={cursorKey} className="cursor-blink"></span>];
+  }
+  
+  const lastIndex = blocks.length - 1;
+  const lastBlock = blocks[lastIndex];
+  const cursor = <span key={cursorKey} className="cursor-blink"></span>;
+  
+  if (React.isValidElement(lastBlock)) {
+    const children = lastBlock.props.children;
+    let newChildren;
+    
+    if (children === undefined || children === null) {
+      newChildren = cursor;
+    } else if (Array.isArray(children)) {
+      if (children.length > 0) {
+        const lastChild = children[children.length - 1];
+        newChildren = [
+          ...children.slice(0, -1),
+          <React.Fragment key="last-with-cursor">
+            {lastChild}
+            {cursor}
+          </React.Fragment>
+        ];
+      } else {
+        newChildren = [cursor];
+      }
+    } else {
+      newChildren = (
+        <React.Fragment key="last-with-cursor">
+          {children}
+          {cursor}
+        </React.Fragment>
+      );
+    }
+    
+    const clonedBlock = React.cloneElement(lastBlock, {}, newChildren);
+    const updatedBlocks = [...blocks];
+    updatedBlocks[lastIndex] = clonedBlock;
+    return updatedBlocks;
+  }
+  
+  return [...blocks, cursor];
+}
+
 // Stateful Loading Card for INQUIRY Actions (like payslip)
 function InquiryLoadingCard({ steps, onComplete }) {
   const [currentStep, setCurrentStep] = useState(0);
@@ -456,9 +733,9 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
               <i className={`fa-solid ${isThinkingExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`} style={{ fontSize: '0.75rem' }} />
             </button>
 
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+            {/* <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
               ⚙️ جاري مراجعة وتحليل لوائح السياسات...
-            </span>
+            </span> */}
           </div>
 
           {isThinkingExpanded && (
@@ -501,12 +778,21 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
 
       {/* 💬 Actual Bot Message Text */}
       {inquiryShowText && (displayedText || isThinkingDone) && (
-        <div style={{ whiteSpace: 'pre-line', fontSize: '0.92rem', lineHeight: '1.7', textAlign: 'right', direction: 'rtl' }} className={isInquiry ? 'animate-fade-in' : ''}>
+        <div 
+          style={{ 
+            fontSize: '0.92rem', 
+            lineHeight: '1.7', 
+            textAlign: isEnglishText(displayedText) ? 'left' : 'right', 
+            direction: isEnglishText(displayedText) ? 'ltr' : 'rtl' 
+          }} 
+          className={`${isInquiry ? 'animate-fade-in' : ''} ${isEnglishText(displayedText) ? 'md-ltr' : ''}`}
+        >
           {displayedText ? (
-            <>
-              {displayedText}
-              {!isTypingCompleted && <span className="cursor-blink"></span>}
-            </>
+            isTypingCompleted ? (
+              renderMarkdown(displayedText)
+            ) : (
+              appendCursor(renderMarkdown(displayedText), 'bot-cursor')
+            )
           ) : (
             !isTypingCompleted && (
               <div className="typing-indicator" style={{ padding: '0.5rem 0', justifyContent: 'flex-start', direction: 'rtl', height: 'auto' }}>

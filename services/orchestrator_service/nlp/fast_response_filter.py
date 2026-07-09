@@ -198,6 +198,8 @@ class FastResponseFilter:
 
         # ─────────────── English Responses ───────────────
         # Keys are lowercase, punctuation-free English text
+        # ─────────────── English Responses ───────────────
+        # Keys are lowercase, punctuation-free English text
         self._english_responses: Dict[str, List[str]] = {
             # Basic greetings
             "hello": [
@@ -322,6 +324,22 @@ class FastResponseFilter:
                 "You're very welcome! It's my pleasure to assist. 😊",
                 "Glad I could help! Don't hesitate to reach out if you need anything else. 👍"
             ],
+            "thank you very much": [
+                "You're very welcome! It's my pleasure to assist. 😊",
+                "Glad I could help! Don't hesitate to reach out if you need anything else. 👍"
+            ],
+            "thankful": [
+                "You're welcome! Happy to help. 😊",
+                "Glad I could assist! Let me know if you need anything else."
+            ],
+            "thx": [
+                "You're welcome! Happy to help. 😊",
+                "Glad I could assist! Let me know if you need anything else."
+            ],
+            "thnk u": [
+                "You're welcome! Happy to help. 😊",
+                "Glad I could assist! Let me know if you need anything else."
+            ],
             "appreciate it": [
                 "You're welcome! Happy to help. 😊",
                 "Glad I could assist! Let me know if you need anything else."
@@ -336,9 +354,9 @@ class FastResponseFilter:
                 "Happy New Year to you too! Wishing you a year full of success and happiness. 🎉 How can I help you today?",
                 "Happy New Year! May this year bring you prosperity and joy. How can I assist you? 🎊"
             ],
-            "merry christmas": [
-                "Merry Christmas to you too! Wishing you a joyful holiday season. 🎄 How can I help you today?",
-                "Merry Christmas! Hope you enjoy the festivities. How can I assist you? 🎅"
+            "jummah mubarak": [
+                "Jummah Mubarak to you too! Wishing you a blessed and peaceful day. ✨ How can I help you today?",
+                "Jummah Mubarak! May this day bring you peace and blessings. How can I assist you? 🤲"
             ],
             "happy holidays": [
                 "Happy holidays to you too! Wishing you a wonderful time. 🎉 How can I help you today?",
@@ -353,8 +371,8 @@ class FastResponseFilter:
                 "Eid Mubarak! Wishing you and your loved ones a blessed and joyful Eid. How can I assist you? 😊"
             ],
             "ramadan mubarak": [
-                "Ramadan Mubarak! Wishing you a blessed and peaceful Ramadan. 🌙 How can I help you today?",
-                "Ramadan Mubarak to you too! May this holy month bring you peace and blessings. How can I assist you? 😊"
+                "Ramadan Mubarak to you and your family! Wishing you a blessed and peaceful month. 🌙 How can I help you today?",
+                "Ramadan Mubarak! May this holy month bring you peace, joy, and blessings. How can I assist you? ✨"
             ],
             "ramadan kareem": [
                 "Ramadan Kareem! Wishing you a blessed and generous Ramadan. 🌙 How can I help you today?",
@@ -379,7 +397,6 @@ class FastResponseFilter:
                 "Take care! I'm always here if you need help. 👋"
             ]
         }
-
         # Backward-compatible unified view (read-only convenience for tests)
         self.predefined_responses: Dict[str, List[str]] = {
             **self._arabic_responses,
@@ -402,14 +419,24 @@ class FastResponseFilter:
     @staticmethod
     def _is_english(text: str) -> bool:
         """
-        Heuristic language detection: if the majority of alphabetic characters
-        in the text are ASCII, the query is treated as English.
+        Heuristic language detection: Checks if the text contains Arabic characters.
+        If no Arabic characters are present, or if ASCII letters dominate, 
+        it treats the query as English/Generic to protect the pipeline.
         """
-        ascii_letters = sum(1 for c in text if c.isascii() and c.isalpha())
-        total_letters = sum(1 for c in text if c.isalpha())
-        if total_letters == 0:
+        if not text:
             return False
-        return (ascii_letters / total_letters) > 0.5
+
+        # If it contains any Arabic character, check the letter distribution
+        if re.search(r'[\u0600-\u06FF]', text):
+            ascii_letters = sum(1 for c in text if c.isascii() and c.isalpha())
+            total_letters = sum(1 for c in text if c.isalpha())
+            if total_letters == 0:
+                return False
+            return (ascii_letters / total_letters) > 0.5
+        
+        # If there are no Arabic characters at all (only English letters, numbers, or symbols like '?')
+        # default to True to trigger the English/Generic handling path.
+        return True
 
     def match(self, query: str) -> Optional[str]:
         """
