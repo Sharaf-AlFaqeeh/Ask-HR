@@ -3,7 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useChatStore } from '../store/useChatStore';
 
 export default function SettingsView() {
-  const { authToken, setAuthToken, consoleLogs, clearConsoleLogs } = useAppStore();
+  const { authToken, setAuthToken, consoleLogs, clearConsoleLogs, indicatorDirection, setIndicatorDirection } = useAppStore();
   const { sessionId, triggerIngest, isIngesting, clearSessionById } = useChatStore();
 
   const [clearId, setClearId] = useState('');
@@ -39,6 +39,25 @@ export default function SettingsView() {
               value={authToken}
               onChange={(e) => setAuthToken(e.target.value)}
             />
+          </div>
+        </div>
+
+        {/* UI Customization settings */}
+        <div className="settings-card">
+          <h3 className="settings-title">تخصيص واجهة المستخدم والتفاعل</h3>
+          <p className="settings-desc">تعديل سلوك واتجاه حركة مؤشرات التفكير والتحليل في النظام.</p>
+
+          <div className="form-group">
+            <label>اتجاه مؤشر التفكير والتحليل (Thinking & Analyzing Direction)</label>
+            <select
+              className="select-style"
+              value={indicatorDirection}
+              onChange={(e) => setIndicatorDirection(e.target.value)}
+            >
+              <option value="rtl">من اليمين إلى اليسار (RTL) - للغة العربية</option>
+              <option value="ltr">من اليسار إلى اليمين (LTR) - للغة الإنجليزية</option>
+              <option value="auto">تلقائي (Auto) - بناءً على لغة النص</option>
+            </select>
           </div>
         </div>
 

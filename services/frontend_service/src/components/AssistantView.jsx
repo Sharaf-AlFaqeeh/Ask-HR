@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChatStore } from '../store/useChatStore';
+import { useAppStore } from '../store/useAppStore';
 
 // Helper to detect if text is predominantly English
 function isEnglishText(text) {
@@ -280,7 +281,9 @@ function appendCursor(blocks, cursorKey) {
 
 // Reusable Thinking & Analyzing Indicator Component
 function ThinkingIndicator({ text, color = 'gold', showIcon = true }) {
-  const isEng = isEnglishText(text);
+  const indicatorDirection = useAppStore((state) => state.indicatorDirection || 'rtl');
+  const isRtl = indicatorDirection === 'auto' ? !isEnglishText(text) : indicatorDirection === 'rtl';
+
   let dotBg = 'linear-gradient(135deg, var(--hsa-gold), var(--hsa-gold-dark))';
   let textColor = 'var(--text-muted)';
   let iconClass = 'fa-solid fa-wand-magic-sparkles';
@@ -293,7 +296,7 @@ function ThinkingIndicator({ text, color = 'gold', showIcon = true }) {
     borderRadius: '12px',
     background: 'rgba(255, 255, 255, 0.03)',
     border: '1px solid rgba(255, 255, 255, 0.05)',
-    direction: isEng ? 'ltr' : 'rtl',
+    direction: isRtl ? 'rtl' : 'ltr',
     height: 'auto',
     marginBottom: '0.5rem'
   };
@@ -325,7 +328,7 @@ function ThinkingIndicator({ text, color = 'gold', showIcon = true }) {
       <span style={{ fontSize: '0.82rem', color: textColor, fontWeight: '600' }}>
         {text}
       </span>
-      <div style={{ display: 'flex', gap: '4px', [isEng ? 'marginLeft' : 'marginRight']: '4px' }}>
+      <div style={{ display: 'flex', gap: '4px', [isRtl ? 'marginRight' : 'marginLeft']: '4px' }}>
         <div className="typing-dot" style={{ background: dotBg, width: '6px', height: '6px' }} />
         <div className="typing-dot" style={{ background: dotBg, width: '6px', height: '6px' }} />
         <div className="typing-dot" style={{ background: dotBg, width: '6px', height: '6px' }} />
@@ -584,6 +587,8 @@ function LeaveRequestForm({ formData, onSubmit, onCancel }) {
 }
 
 function BotMessageBubble({ msg, index, activePendingAction, executePendingAction, sendQuery, activeLeaveForm, submitLeaveForm }) {
+  const indicatorDirection = useAppStore((state) => state.indicatorDirection || 'rtl');
+  
   const [displayedText, setDisplayedText] = useState('');
   const [thinkingText, setThinkingText] = useState('');
   const [isThinkingDone, setIsThinkingDone] = useState(false);
@@ -591,6 +596,8 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
   const [isTypingCompleted, setIsTypingCompleted] = useState(false);
   const [copied, setCopied] = useState(false);
   const [inquiryCompleted, setInquiryCompleted] = useState(false);
+
+  const isBubbleRtl = indicatorDirection === 'auto' ? !isEnglishText(displayedText || msg.text || msg.rawTextTarget) : indicatorDirection === 'rtl';
 
   const isHistory = !msg.rawTextBuffer && !msg.rawTextTarget && msg.text;
 
@@ -766,7 +773,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
       {/* 🧠 Thinking Block */}
       {inquiryShowText && (!isThinkingDone || (msg.citations && msg.citations.length > 0)) && (
         <div className="thinking-process-container animate-fade-in" style={{ marginBottom: '0.6rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', direction: 'rtl', justifyContent: 'flex-start' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', direction: isBubbleRtl ? 'rtl' : 'ltr', justifyContent: 'flex-start' }}>
             <button
               onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
               style={{
@@ -798,7 +805,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
           {isThinkingExpanded && (
             <div className="thinking-process-content" style={{ marginTop: '0.4rem', padding: '0.6rem 0.8rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.12)', border: '1px solid rgba(255,255,255,0.03)' }}>
               {/* Simulated typing status */}
-              <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', direction: 'rtl' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', direction: isBubbleRtl ? 'rtl' : 'ltr' }}>
                 {!isThinkingDone ? (
                   <ThinkingIndicator text={thinkingText} color="blue" />
                 ) : (
@@ -815,13 +822,13 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
                 if (!typedText) return null; // Don't render if we haven't started typing this citation yet
                 return (
                   <div key={cIdx} className="citation-block" style={{ padding: '0.5rem 0', borderBottom: cIdx < msg.citations.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                    <div className="citation-text" style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '0.25rem', direction: 'rtl', textAlign: 'right' }}>
+                    <div className="citation-text" style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '0.25rem', direction: isBubbleRtl ? 'rtl' : 'ltr', textAlign: isBubbleRtl ? 'right' : 'left' }}>
                       "{typedText}"
                       {cIdx === typedCitations.length - 1 && !isThinkingDone && <span className="cursor-blink"></span>}
                     </div>
                     <div className="citation-meta" style={{ display: 'flex', justifyContent: 'flex-start' }}>
                       <a
-                        href={`http://127.0.0.1:8081/policies-files/${cit.category}/${cit.source}#page=${cit.page_number}`}
+                         href={`http://127.0.0.1:8081/policies-files/${cit.category}/${cit.source}#page=${cit.page_number}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="citation-link"
@@ -845,10 +852,10 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
           style={{
             fontSize: '0.92rem',
             lineHeight: '1.7',
-            textAlign: isEnglishText(displayedText) ? 'left' : 'right',
-            direction: isEnglishText(displayedText) ? 'ltr' : 'rtl'
+            textAlign: (displayedText ? isEnglishText(displayedText) : !isBubbleRtl) ? 'left' : 'right',
+            direction: (displayedText ? isEnglishText(displayedText) : !isBubbleRtl) ? 'ltr' : 'rtl'
           }}
-          className={`${isInquiry ? 'animate-fade-in' : ''} ${isEnglishText(displayedText) ? 'md-ltr' : ''}`}
+          className={`${isInquiry ? 'animate-fade-in' : ''} ${(displayedText ? isEnglishText(displayedText) : !isBubbleRtl) ? 'md-ltr' : ''}`}
         >
           {displayedText ? (
             isTypingCompleted ? (
@@ -979,8 +986,11 @@ export default function AssistantView() {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const chatMessagesRef = useRef(null);
+  const messagesInnerRef = useRef(null);
 
   const messages = useChatStore((state) => state.messages);
+  const sessionId = useChatStore((state) => state.sessionId);
   const isWaitingResponse = useChatStore((state) => state.isWaitingResponse);
   const abortController = useChatStore((state) => state.abortController);
   const sendQuery = useChatStore((state) => state.sendQuery);
@@ -991,6 +1001,7 @@ export default function AssistantView() {
   const submitLeaveForm = useChatStore((state) => state.submitLeaveForm);
 
   const isGenerating = isWaitingResponse || abortController !== null;
+  const messagesRef = useRef(messages);
 
   const handleSend = (overrideQuery) => {
     if (isGenerating) {
@@ -1039,12 +1050,55 @@ export default function AssistantView() {
     }
   }, [isGenerating, activePendingAction]);
 
-  // Scroll to bottom on new messages or when waiting state changes
+  // Keep messages ref up to date for scroll observer callback
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, isWaitingResponse]);
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // Auto-scroll logic during typing/streaming using ResizeObserver
+  useEffect(() => {
+    const container = chatMessagesRef.current;
+    const inner = messagesInnerRef.current;
+    if (!container || !inner) return;
+
+    // Scroll to bottom immediately on session change or new message
+    container.scrollTo({ top: container.scrollHeight, behavior: 'auto' });
+
+    let lastScrollTop = container.scrollTop;
+    let lastScrollHeight = container.scrollHeight;
+
+    const handleScroll = () => {
+      lastScrollTop = container.scrollTop;
+      lastScrollHeight = container.scrollHeight;
+    };
+    container.addEventListener('scroll', handleScroll);
+
+    const observer = new ResizeObserver(() => {
+      const newScrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
+
+      // Check if user was scrolled to the bottom (within threshold of 150px)
+      const isAtBottom = lastScrollTop + clientHeight >= lastScrollHeight - 150;
+      
+      const currentMessages = messagesRef.current;
+      const lastMessage = currentMessages[currentMessages.length - 1];
+      const isLastMessageUser = lastMessage && lastMessage.sender === 'user';
+
+      if (isAtBottom || isLastMessageUser) {
+        container.scrollTo({ top: newScrollHeight, behavior: 'auto' });
+      }
+
+      lastScrollHeight = newScrollHeight;
+      lastScrollTop = container.scrollTop;
+    });
+
+    observer.observe(inner);
+
+    return () => {
+      observer.disconnect();
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, [sessionId]);
 
   const isEmpty = messages.length === 0;
 
@@ -1058,7 +1112,8 @@ export default function AssistantView() {
   return (
     <div id="view-assistant" className="view-panel active">
       <main className="glass-card chat-container">
-        <div className="chat-messages" id="chat-messages">
+        <div className="chat-messages" id="chat-messages" ref={chatMessagesRef}>
+          <div ref={messagesInnerRef} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
           {isEmpty ? (
             <div className="empty-state" id="empty-state">
               <div className="empty-state-hero">
@@ -1130,6 +1185,7 @@ export default function AssistantView() {
               </div>
             </div>
           )}
+          </div>
           <div ref={messagesEndRef} />
         </div>
 

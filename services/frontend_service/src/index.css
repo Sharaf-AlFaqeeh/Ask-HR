@@ -3431,3 +3431,35 @@ body.light-theme .md-table tr:hover td {
     text-align: left;
 }
 
+/* Custom Select Dropdown Styling for Settings view */
+.select-style {
+    background-color: var(--hsa-navy-input) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #fff;
+    border-radius: 8px;
+    padding: 10px 12px;
+    outline: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+    font-family: var(--font-main);
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.select-style:focus {
+    border-color: var(--hsa-gold) !important;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.15);
+}
+
+body.light-theme .select-style {
+    background-color: #ffffff !important;
+    border: 1px solid rgba(0, 86, 179, 0.15);
+    color: #0f172a;
+}
+
+body.light-theme .select-style:focus {
+    border-color: var(--accent-purple) !important;
+    box-shadow: 0 0 10px rgba(92, 91, 229, 0.15);
+}
+
+

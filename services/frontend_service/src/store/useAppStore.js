@@ -9,6 +9,7 @@ export const useAppStore = create((set, get) => ({
   activeView: 'assistant',
   sidebarCollapsed: localStorage.getItem('sidebarCollapsed') !== 'false',
   authToken: localStorage.getItem('authToken') || null,
+  indicatorDirection: localStorage.getItem('indicatorDirection') || 'rtl',
   loggedInUser: JSON.parse(localStorage.getItem('userProfile')) || null,
   serverStatus: 'checking',
   serverStatusText: 'جاري الفحص...',
@@ -28,6 +29,12 @@ export const useAppStore = create((set, get) => ({
   setAuthToken: (token) => {
     set({ authToken: token });
     get().addConsoleLog('تم تحديث مفتاح الوصول Authentication Token', 'info');
+  },
+
+  setIndicatorDirection: (dir) => {
+    localStorage.setItem('indicatorDirection', dir);
+    set({ indicatorDirection: dir });
+    get().addConsoleLog(`تم تعديل اتجاه مؤشر التفكير إلى: ${dir === 'rtl' ? 'من اليمين إلى اليسار (RTL)' : dir === 'ltr' ? 'من اليسار إلى اليمين (LTR)' : 'تلقائي (Auto)'}`, 'info');
   },
 
   toggleSidebar: () => {
