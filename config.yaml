@@ -15,8 +15,8 @@ llm:
   # - services/llm_inference_service/models/qwen2.5-3b-instruct-q4_k_m.gguf (Recommended: Balanced)
   # - services/llm_inference_service/models/qwen2.5-1.5b-instruct-q4_k_m.gguf (Fastest)
 
-  # model_path: "services/llm_inference_service/models/qwen2.5-3b-instruct-q4_k_m.gguf"
-  model_path: "services/llm_inference_service/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+  model_path: "services/llm_inference_service/models/qwen2.5-3b-instruct-q4_k_m.gguf"
+  # model_path: "services/llm_inference_service/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"
   
   n_ctx: 4096              # Context window size
   n_threads: 8             # Number of CPU threads to use for local execution
