@@ -65,6 +65,10 @@ class DIContainer:
         # Instantiate Fast Response Filter
         self.fast_response_filter = FastResponseFilter()
         
+        # Instantiate Feedback and Follow-up Filter
+        from services.orchestrator_service.nlp.feedback_filter import FeedbackFilter
+        self.feedback_filter = FeedbackFilter()
+        
         # 3. Instantiate and wire FlowOrchestrator
         self.flow_orchestrator = FlowOrchestrator(
             llm_client=self.llm_client,
@@ -72,7 +76,8 @@ class DIContainer:
             hr_client=self.hr_client,
             session_store=self.session_store,
             nlp_pipeline=self.nlp_pipeline,
-            fast_response_filter=self.fast_response_filter
+            fast_response_filter=self.fast_response_filter,
+            feedback_filter=self.feedback_filter
         )
         
         self._initialized = True

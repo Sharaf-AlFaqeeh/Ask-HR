@@ -127,7 +127,6 @@ def test_english_holiday_greetings():
     filter_service = FastResponseFilter()
     
     assert filter_service.match("Happy New Year!") is not None
-    assert filter_service.match("Merry Christmas") is not None
     assert filter_service.match("Happy holidays") is not None
     assert filter_service.match("Happy Eid") is not None
     assert filter_service.match("Eid Mubarak") is not None

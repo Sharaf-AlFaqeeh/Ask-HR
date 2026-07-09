@@ -354,6 +354,7 @@ class FastResponseFilter:
                 "Happy New Year to you too! Wishing you a year full of success and happiness. 🎉 How can I help you today?",
                 "Happy New Year! May this year bring you prosperity and joy. How can I assist you? 🎊"
             ],
+            
             "jummah mubarak": [
                 "Jummah Mubarak to you too! Wishing you a blessed and peaceful day. ✨ How can I help you today?",
                 "Jummah Mubarak! May this day bring you peace and blessings. How can I assist you? 🤲"

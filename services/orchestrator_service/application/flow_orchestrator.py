@@ -26,7 +26,8 @@ class FlowOrchestrator:
         hr_client: IHRSystemClient,
         session_store: ISessionStore,
         nlp_pipeline: INLPPipeline,
-        fast_response_filter: Optional[Any] = None
+        fast_response_filter: Optional[Any] = None,
+        feedback_filter: Optional[Any] = None
     ):
         self.llm_client = llm_client
         self.retriever = retriever
@@ -34,6 +35,7 @@ class FlowOrchestrator:
         self.session_store = session_store
         self.nlp_pipeline = nlp_pipeline
         self.fast_response_filter = fast_response_filter
+        self.feedback_filter = feedback_filter
         self.dialog_manager = SessionManager()
         self.date_resolver = SmartDateResolver()
         self.settings = get_settings()
@@ -88,6 +90,35 @@ class FlowOrchestrator:
                     sap_executed=False,
                     session_pending=False
                 )
+
+        # Intercept feedback/acknowledgement using FeedbackFilter
+        if self.feedback_filter and not session.pending_action:
+            feedback_response = self.feedback_filter.match_feedback(query, session.history[:-1])
+            if feedback_response:
+                logger.info("Feedback response matched — bypassing LLM and RAG pipelines.")
+                session.add_message(role="assistant", content=feedback_response)
+                self.session_store.save_session(session)
+                
+                total_duration = time.time() - start_time
+                logger.info(f"Feedback response served in {total_duration:.3f}s")
+                
+                return self._build_response_payload(
+                    query=query,
+                    intent="GREETING",
+                    confidence=1.0,
+                    entities={},
+                    response=feedback_response,
+                    context_used=False,
+                    sap_executed=False,
+                    session_pending=False
+                )
+
+            # Intercept contextual follow-up using FeedbackFilter
+            # session.history contains the user query we just added at [-1], so we pass history[:-1]
+            rewritten_query = self.feedback_filter.match_followup(query, session.history[:-1])
+            if rewritten_query:
+                logger.info(f"Contextual follow-up detected. Rewriting query from '{query}' to '{rewritten_query}'")
+                query = rewritten_query
 
         # 2. Run Intent Routing and Entity Extraction
         nlp_start = time.time()
@@ -518,6 +549,34 @@ class FlowOrchestrator:
                     is_chunk=False
                 )
                 return
+
+        # Intercept feedback/acknowledgement using FeedbackFilter
+        if self.feedback_filter and not session.pending_action:
+            feedback_response = self.feedback_filter.match_feedback(query, session.history[:-1])
+            if feedback_response:
+                logger.info("Feedback response matched (stream) — bypassing LLM and RAG pipelines.")
+                session.add_message(role="assistant", content=feedback_response)
+                self.session_store.save_session(session)
+                
+                yield self._build_response_payload(
+                    query=query,
+                    intent="GREETING",
+                    confidence=1.0,
+                    entities={},
+                    response=feedback_response,
+                    context_used=False,
+                    sap_executed=False,
+                    session_pending=False,
+                    is_chunk=False
+                )
+                return
+
+            # Intercept contextual follow-up using FeedbackFilter
+            # session.history contains the user query we just added at [-1], so we pass history[:-1]
+            rewritten_query = self.feedback_filter.match_followup(query, session.history[:-1])
+            if rewritten_query:
+                logger.info(f"Contextual follow-up detected. Rewriting query from '{query}' to '{rewritten_query}'")
+                query = rewritten_query
 
         # 2. Run Intent Routing and Entity Extraction
         nlp_start = time.time()
