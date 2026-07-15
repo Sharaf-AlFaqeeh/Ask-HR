@@ -1160,6 +1160,17 @@ body[dir="ltr"] .activity-table {
     align-self: flex-end;
 }
 
+/* RTL Layout Alignment Mirroring: Bot on right (anchored right to grow leftwards without shifting), User on left */
+/* [dir="rtl"] .message-wrapper.user, */
+body[dir="rtl"] .message-wrapper.user {
+    align-self: flex-end;
+}
+
+[dir="rtl"] .message-wrapper.bot,
+body[dir="rtl"] .message-wrapper.bot {
+    align-self: flex-start;
+}
+
 @keyframes messageFadeIn {
     from { opacity: 0; transform: translateY(12px) scale(0.97); filter: blur(2px); }
     to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
@@ -1210,19 +1221,19 @@ body[dir="ltr"] .activity-table {
     transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* User bubble — organic rounded shape */
+/* User bubble — organic rounded shape with a hairline contrast background */
 .message-wrapper.user .message-bubble {
-    background: transparent;
+    background: rgba(255, 255, 255, 0.015);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 0.55rem 0.85rem;
     color: #ffffff;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .message-wrapper.user:hover .message-bubble {
-    background: transparent;
-    border: none;
-    box-shadow: none;
+    background: rgba(255, 255, 255, 0.025);
+    border-color: rgba(255, 255, 255, 0.05);
 }
 
 .user-bubble-wrapper {
@@ -2118,17 +2129,17 @@ body.light-theme .message-wrapper.bot .message-bubble {
 }
 
 body.light-theme .message-wrapper.user .message-bubble {
-    background: transparent;
+    background: rgba(0, 0, 0, 0.012);
+    border: 1px solid rgba(0, 0, 0, 0.025);
+    border-radius: 12px;
+    padding: 0.55rem 0.85rem;
     color: #0f172a;
-    border: none;
-    box-shadow: none;
-    padding: 0.4rem 0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
 }
 
 body.light-theme .message-wrapper.user:hover .message-bubble {
-    background: transparent;
-    border: none;
-    box-shadow: none;
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.04);
 }
 
 body.light-theme .message-avatar.user {
@@ -2462,61 +2473,64 @@ body.light-theme .theme-toggle-pill {
     to { opacity: 1; transform: translateY(0); }
 }
 
-.citation-block {
+/* --- CITATIONS DEEP CONTAINER --- */
+.citations-deep-container {
+    background: rgba(8, 12, 24, 0.28);
+    backdrop-filter: blur(12px) saturate(1.2);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.015);
+    border-radius: 14px;
+    padding: 0.85rem 1.1rem;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.35);
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: 12px;
-    padding: 0.65rem 0.85rem;
-    transition: all 0.25s ease;
+    gap: 0.85rem; /* soft space between paragraphs */
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: citationsSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.citation-block:hover {
-    background: rgba(255, 255, 255, 0.035);
-    border-color: rgba(129, 140, 248, 0.12);
-    transform: translateY(-1px);
+.citations-deep-container:hover {
+    border-color: rgba(212, 175, 55, 0.08);
+    background: rgba(8, 12, 24, 0.38);
 }
 
-.citation-text {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    line-height: 1.65;
-    font-style: italic;
-    background: transparent;
+.citation-paragraph {
+    display: block;
+    margin: 0;
     padding: 0;
-    border-radius: 0;
-    border-right: 2px solid rgba(129, 140, 248, 0.35);
-    padding-right: 0.65rem;
 }
 
-.citation-meta {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 0.15rem;
-}
-
-.citation-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    background: rgba(212, 175, 55, 0.06);
-    border: 1px solid rgba(212, 175, 55, 0.15);
+.citation-paragraph-text {
+    font-size: 0.84rem;
+    line-height: 1.65;
     color: var(--hsa-gold);
-    padding: 0.2rem 0.55rem;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 500;
-    text-decoration: none;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.95;
 }
 
-.citation-link:hover {
-    background: rgba(212, 175, 55, 0.12);
-    border-color: rgba(212, 175, 55, 0.35);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(212, 175, 55, 0.1);
+.citation-quote-mark {
+    color: rgba(212, 175, 55, 0.6);
+    font-weight: 500;
+    margin: 0 0.15rem;
+}
+
+.citation-inline-link {
+    margin-right: 0.35rem;
+    margin-left: 0.35rem;
+    font-size: 0.72rem;
+    color: #38bdf8;
+    text-decoration: none;
+    font-weight: bold;
+    vertical-align: super;
+    opacity: 0.9;
+    transition: all 0.2s ease;
+}
+
+.citation-inline-link:hover {
+    color: #60a5fa;
+    opacity: 1;
+    text-shadow: 0 0 8px rgba(96, 165, 250, 0.4);
 }
 
 /* Light Theme overrides */
@@ -2534,24 +2548,31 @@ body.light-theme .thinking-process-toggle:hover {
     color: #4338ca;
 }
 
-body.light-theme .thinking-process-content {
-    background: rgba(0, 0, 0, 0.02);
-    border-color: rgba(0, 0, 0, 0.05);
+body.light-theme .citations-deep-container {
+    background: rgba(15, 23, 42, 0.035); /* Deep slate translucent in light theme */
+    border: 1px solid rgba(0, 86, 179, 0.03);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
-body.light-theme .citation-text {
-    border-right-color: rgba(79, 70, 229, 0.5);
+body.light-theme .citations-deep-container:hover {
+    background: rgba(15, 23, 42, 0.06);
+    border-color: rgba(212, 175, 55, 0.2);
 }
 
-body.light-theme .citation-link {
-    background: rgba(212, 175, 55, 0.12);
-    border-color: rgba(212, 175, 55, 0.25);
-    color: #855e00;
+body.light-theme .citation-paragraph-text {
+    color: #855e00; /* Darker, high contrast gold/bronze for light theme */
 }
 
-body.light-theme .citation-link:hover {
-    background: rgba(212, 175, 55, 0.2);
-    border-color: rgba(212, 175, 55, 0.5);
+body.light-theme .citation-quote-mark {
+    color: rgba(133, 94, 0, 0.7);
+}
+
+body.light-theme .citation-inline-link {
+    color: #0284c7;
+}
+
+body.light-theme .citation-inline-link:hover {
+    color: #0369a1;
 }
 
 /* --- LOGIN PAGE STYLES --- */

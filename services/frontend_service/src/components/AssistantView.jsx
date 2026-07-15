@@ -774,7 +774,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
       {/* 🧠 Thinking Block */}
       {inquiryShowText && (!isThinkingDone || (msg.citations && msg.citations.length > 0)) && (
         <div className="thinking-process-container animate-fade-in" style={{ marginBottom: '0.2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', direction: isBubbleRtl ? 'rtl' : 'ltr', justifyContent: 'flex-start' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', direction: isBubbleRtl ? 'rtl' : 'ltr', justifyContent: 'flex-start', marginBottom: '0.2rem' }}>
             <button
               onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
               style={{
@@ -797,41 +797,47 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
             >
               <i className={`fa-solid ${isThinkingExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`} style={{ fontSize: '0.75rem' }} />
             </button>
-
-            {/* Simulated typing status - moved next to expand button */}
             {!isThinkingDone ? (
               <ThinkingIndicator text={thinkingText} color="blue" />
             ) : (
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <i className="fa-solid fa-circle-check" style={{ color: 'var(--success)', fontSize: '0.85rem' }} />
-                <span style={{ fontWeight: '600' }}>{thinkingText}</span>
-              </div>
+              <span 
+                style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500, cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
+              >
+                مراجع السياسات واللوائح ({msg.citations ? msg.citations.length : 0})
+              </span>
             )}
           </div>
 
-          {isThinkingExpanded && (
-            <div className="thinking-process-content" style={{ marginTop: '0.2rem', padding: '0 0.2rem' }}>
+          {isThinkingExpanded && msg.citations && msg.citations.length > 0 && (
+            <div className="citations-deep-container">
               {/* Citations references */}
-              {msg.citations && msg.citations.length > 0 && msg.citations.map((cit, cIdx) => {
+              {msg.citations.map((cit, cIdx) => {
                 const typedText = typedCitations[cIdx] || '';
                 if (!typedText) return null; // Don't render if we haven't started typing this citation yet
                 return (
-                  <div key={cIdx} className="citation-block" style={{ padding: '0.3rem 0' }}>
-                    <div className="citation-text" style={{ fontSize: '0.85rem', color: 'var(--hsa-gold)', opacity: 0.95, marginBottom: '0.25rem', direction: isBubbleRtl ? 'rtl' : 'ltr', textAlign: isBubbleRtl ? 'right' : 'left' }}>
-                      "{typedText}"
-                      {cIdx === typedCitations.length - 1 && !isThinkingDone && <span className="cursor-blink"></span>}
-                    </div>
-                    <div className="citation-meta" style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <div
+                    key={cIdx}
+                    className="citation-paragraph"
+                    style={{
+                      direction: isBubbleRtl ? 'rtl' : 'ltr',
+                      textAlign: isBubbleRtl ? 'right' : 'left'
+                    }}
+                  >
+                    <div className="citation-paragraph-text">
+                      <span className="citation-quote-mark">"</span>
+                      {typedText}
+                      <span className="citation-quote-mark">"</span>
                       <a
-                         href={`http://127.0.0.1:8081/policies-files/${cit.category}/${cit.source}#page=${cit.page_number}`}
+                        href={`http://127.0.0.1:8081/policies-files/${cit.category}/${cit.source}#page=${cit.page_number}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="citation-link"
-                        style={{ fontSize: '0.75rem', color: 'var(--hsa-gold)', opacity: 0.8, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                        className="citation-inline-link"
+                        title={`${cit.source} (صفحة ${cit.page_number})`}
                       >
-                        <i className="fa-solid fa-file-pdf"></i>
-                        <span>{cit.source} (صفحة {cit.page_number})</span>
+                        [{cIdx + 1}]
                       </a>
+                      {cIdx === typedCitations.length - 1 && !isThinkingDone && <span className="cursor-blink"></span>}
                     </div>
                   </div>
                 );
