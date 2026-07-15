@@ -1216,10 +1216,10 @@ export default function AssistantView() {
               )}
             </button>
           </div>
-          <div className="chat-input-hint">
+          {/* <div className="chat-input-hint">
             <i className="fa-solid fa-shield-halved"></i>
-            <span>محادثاتك محمية ومؤمّنة بالكامل عبر SharePoint SSO</span>
-          </div>
+            { <span>محادثاتك محمية ومؤمّنة بالكامل عبر SharePoint SSO</span>}
+          </div> */}
         </div>
       </main>
     </div>

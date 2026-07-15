@@ -42,7 +42,7 @@ export default function Sidebar() {
               <i className="fa-solid fa-bars"></i>
             </button>
           </div>
-          <div className="sidebar-subtitle">HSA GROUP CORPORATE AI SUITE</div>
+          {/* <div className="sidebar-subtitle">HSA GROUP CORPORATE AI SUITE</div> */}
         </div>
 
         {/* Persistent Chat Sessions History Manager */}
