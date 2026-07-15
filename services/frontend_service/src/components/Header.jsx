@@ -113,7 +113,7 @@ export default function Header() {
         <div className="user-profile-header">
           <div className="user-info-text">
             <span className="user-name">
-              {loggedInUser ? `${loggedInUser.first_name} ${loggedInUser.last_name}` : 'زائر'}
+              {loggedInUser ? `${loggedInUser.first_name}${loggedInUser.last_name ? ' ' + loggedInUser.last_name : ''}` : 'زائر'}
             </span>
             <span className="user-dept">
               {loggedInUser ? loggedInUser.department : 'شير بونت SSO'}
@@ -125,7 +125,7 @@ export default function Header() {
             onClick={() => switchView('settings')}
             title={loggedInUser ? `الموظف: ${loggedInUser.first_name}` : 'المستخدم'}
           >
-            {loggedInUser ? `${loggedInUser.first_name[0]}${loggedInUser.last_name[0]}`.toUpperCase() : 'HR'}
+            {loggedInUser ? `${loggedInUser.first_name[0] || ''}${loggedInUser.last_name?.[0] || ''}`.toUpperCase() : 'HR'}
           </div>
         </div>
       </div>

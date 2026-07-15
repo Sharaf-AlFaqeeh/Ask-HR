@@ -10,7 +10,7 @@ export default function SharepointLogin({ onLoginSuccess }) {
 
   // Quick profiles for simulation
   const mockProfiles = [
-    { name: 'Testing User', email: 'ahmed.alsaeed@hsagroup.com', role: 'موارد بشرية (HR Specialist)', empId: 'EMP101' },
+    { name: 'Sharaf', email: 'sharaf@hsagroup.com', role: 'الذكاء الاصطناعي (AI)', empId: 'EMP101' },
     { name: 'Testing User 2', email: 'khaled.mutahar@hsagroup.com', role: 'الذكاء الاصطناعي (AI Lead)', empId: 'EMP102' },
     { name: 'Testing User 3', email: 'sarah.jamil@hsagroup.com', role: 'المالية (Financial Analyst)', empId: 'EMP103' },
     { name: 'علي منصور', email: 'ali.mansoor@hsagroup.com', role: 'المبيعات (Sales Rep)', empId: 'EMP104' }

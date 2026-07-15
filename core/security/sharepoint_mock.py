@@ -2,15 +2,15 @@ from typing import Dict, Any, Optional
 
 # Mock User Directory simulating SharePoint Active Directory linked to SAP SuccessFactors
 MOCK_USERS_DIRECTORY: Dict[str, Dict[str, Any]] = {
-    "ahmed.alsaeed@hsagroup.com": {
+    "sharaf@hsagroup.com": {
         "employee_id": "EMP101",
-        "username": "ahmed.alsaeed",
+        "username": "sharaf",
         "password": "password123",
-        "first_name": "Ahmed",
-        "last_name": "Al-Saeed",
-        "department": "Human Resources",
-        "position": "HR Specialist",
-        "email": "ahmed.alsaeed@hsagroup.com",
+        "first_name": "Sharaf",
+        "last_name": "",
+        "department": "AI",
+        "position": "AI",
+        "email": "sharaf@hsagroup.com",
         "roles": ["employee", "hr_admin"],
         "tenant_id": "HSAGroup",
         "leave_balance": {"annual": 25, "sick": 14, "unpaid": 30}

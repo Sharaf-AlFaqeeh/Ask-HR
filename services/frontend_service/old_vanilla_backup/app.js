@@ -1,7 +1,7 @@
 // AskHR Enterprise AI Orchestration Suite - Frontend Engine (app.js)
 
-const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://127.0.0.1:8081' 
+const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://127.0.0.1:8081'
     : window.location.origin.replace(':8082', ':8081');
 
 let currentSessionId = null;
@@ -23,7 +23,7 @@ window.addEventListener('load', () => {
     loadSavedTheme();
     addConsoleLog('تم تشغيل لوحة التحكم ومكتبة الرسوم البيانية بنجاح.', 'success');
     addConsoleLog('نظام أوركسترا AskHR نشط وجاهز لاستقبال الاتصالات.', 'info');
-    
+
     // Check health every 15 seconds
     setInterval(checkServerHealth, 15000);
 });
@@ -34,7 +34,7 @@ function switchView(viewName) {
     document.querySelectorAll('.view-panel').forEach(panel => {
         panel.classList.remove('active');
     });
-    
+
     // Deactivate all nav links
     document.querySelectorAll('.nav-link').forEach(link => {
         link.classList.remove('active');
@@ -43,19 +43,19 @@ function switchView(viewName) {
     // Show selected view and activate sidebar item
     const targetPanel = document.getElementById(`view-${viewName}`);
     const targetLink = document.getElementById(`nav-${viewName}`);
-    
+
     if (targetPanel && targetLink) {
         targetPanel.classList.add('active');
         targetLink.classList.add('active');
         addConsoleLog(`تم الانتقال بنجاح إلى واجهة: ${targetLink.innerText.trim()}`, 'info');
     }
-    
+
     // Switch header tabs highlighting if viewing dashboard/assistant
     const headerTabs = document.querySelectorAll('.header-tab');
     headerTabs.forEach(tab => {
         tab.classList.remove('active');
     });
-    
+
     if (viewName === 'dashboard') {
         const tab = document.getElementById('header-tab-overview');
         if (tab) tab.classList.add('active');
@@ -73,7 +73,7 @@ async function checkServerHealth() {
         const response = await fetch(`${baseUrl}/health`);
         const dot = document.getElementById('server-status-dot');
         const text = document.getElementById('server-status-text');
-        
+
         if (response.ok) {
             dot.className = 'status-dot';
             text.innerText = 'متصل';
@@ -102,7 +102,7 @@ async function checkServerHealth() {
 function initChart() {
     const ctx = document.getElementById('latencyChart');
     if (!ctx) return;
-    
+
     // Generate initial time metrics
     for (let i = 6; i >= 0; i--) {
         const d = new Date();
@@ -152,19 +152,19 @@ function initChart() {
 // Add point to chart
 function updateChart(latencyVal) {
     if (!latencyChart) return;
-    
+
     const now = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    
+
     latencyChart.data.labels.push(now);
     latencyChart.data.datasets[0].data.push(latencyVal);
-    
+
     if (latencyChart.data.labels.length > 8) {
         latencyChart.data.labels.shift();
         latencyChart.data.datasets[0].data.shift();
     }
-    
+
     latencyChart.update();
-    
+
     // Update metric cards
     queryCount++;
     totalLatencySum += latencyVal;
@@ -176,12 +176,12 @@ function updateChart(latencyVal) {
 function addConsoleLog(message, type = 'info') {
     const consoleBox = document.getElementById('console-output');
     if (!consoleBox) return;
-    
+
     const logLine = document.createElement('div');
     logLine.className = 'console-line';
-    
+
     const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    
+
     let typeBadge = '<span class="console-type-info">[INFO]</span>';
     if (type === 'success') typeBadge = '<span class="console-type-success">[SUCCESS]</span>';
     if (type === 'warn') typeBadge = '<span class="console-type-warn">[WARN]</span>';
@@ -203,7 +203,7 @@ function startNewSession() {
     currentSessionId = null;
     document.getElementById('metrics-sessions').innerText = '0';
     activeSessionsCount = 0;
-    
+
     const messagesContainer = document.getElementById('chat-messages');
     messagesContainer.innerHTML = `
         <div class="empty-state" id="empty-state">
@@ -221,14 +221,14 @@ function startNewSession() {
             </div>
         </div>
     `;
-    
+
     // Reset tracker panel
     document.getElementById('state-session-id').innerText = 'لا توجد جلسة نشطة';
     document.getElementById('state-session-id').classList.add('empty');
-    
+
     document.getElementById('state-intent').innerText = 'غير مححدد';
     document.getElementById('state-intent').className = 'state-value empty';
-    
+
     document.getElementById('state-confidence').innerText = '-';
     document.getElementById('state-confidence').classList.add('empty');
 
@@ -259,10 +259,10 @@ function handleSend() {
 // Send user text to API endpoints
 async function sendQuery(query) {
     if (isWaitingResponse) return;
-    
+
     const startTime = performance.now();
     const messagesContainer = document.getElementById('chat-messages');
-    
+
     // Remove empty screen
     const emptyState = document.getElementById('empty-state');
     if (emptyState) {
@@ -271,7 +271,7 @@ async function sendQuery(query) {
 
     // Render User Message
     appendMessage('user', query);
-    
+
     // Render Loading Dots
     const typingIndicator = appendTypingIndicator();
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -308,7 +308,7 @@ async function sendQuery(query) {
         }
 
         const result = await response.json();
-        
+
         // Track session state
         if (result.session_id) {
             if (currentSessionId !== result.session_id) {
@@ -325,21 +325,21 @@ async function sendQuery(query) {
         updateChart(latency);
         totalQueries++;
         document.getElementById('metrics-queries').innerText = totalQueries.toLocaleString();
-        
+
         // Append log to Table Activity Stream
         addActivityRow('موظف HSA', `أجرى استعلاماً بنوع النية '${result.intent}'`, result.sap_executed ? 'ONLINE' : 'ONLINE', latency);
-        
+
         addConsoleLog(`تم الاستلام. نية المستخدم: '${result.intent}' (الثقة: ${Math.round(result.confidence * 100)}%) خلال ${latency}ms`, 'success');
 
         // Append Bot Reply
         appendMessage('bot', result.response, result);
-        
+
         // Refresh States panel UI
         updateStateTracker(result);
 
     } catch (err) {
         typingIndicator.remove();
-        appendMessage('bot', `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم على المنفذ الصحيح. (${err.message})`);
+        appendMessage('bot', `⚠️ فشل إرسال الطلب: تأكد من الإتصال بالخادم على المنفذ الصحيح. (${err.message})`);
         addConsoleLog(`خطأ شبكة: ${err.message}`, 'error');
     } finally {
         isWaitingResponse = false;
@@ -420,11 +420,11 @@ function appendTypingIndicator() {
 
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
-    
+
     const indicator = document.createElement('div');
     indicator.className = 'typing-indicator';
     indicator.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
-    
+
     bubble.appendChild(indicator);
     wrapper.appendChild(avatar);
     wrapper.appendChild(bubble);
@@ -438,7 +438,7 @@ function updateStateTracker(result) {
     const sessionIdEl = document.getElementById('state-session-id');
     sessionIdEl.innerText = result.session_id;
     sessionIdEl.classList.remove('empty');
-    
+
     // Propagate session id to admin forms
     document.getElementById('session-clear-id').value = result.session_id;
 
@@ -480,7 +480,7 @@ function updateSlotBadge(badgeId, value) {
 async function triggerIngest() {
     const token = document.getElementById('auth-token').value.trim();
     const btn = document.getElementById('btn-ingest');
-    
+
     addConsoleLog('جاري إرسال طلب إعادة الفهرسة والـ chunking لمستندات السياسات...', 'info');
     btn.style.opacity = '0.6';
     btn.innerHTML = '<i class="fa-solid fa-sync fa-spin"></i> جاري تحديث الفهرس...';
@@ -502,7 +502,7 @@ async function triggerIngest() {
             addConsoleLog(`فشل تحديث الفهرس: ${err}`, 'error');
             alert(`خطأ: ${err}`);
         }
-    } catch(e) {
+    } catch (e) {
         addConsoleLog(`خطأ اتصال: ${e.message}`, 'error');
         alert(`خطأ شبكة: ${e.message}`);
     } finally {
@@ -545,7 +545,7 @@ async function clearSessionById() {
             addConsoleLog(`فشل مسح الجلسة: ${err}`, 'error');
             alert(`خطأ: ${err}`);
         }
-    } catch(e) {
+    } catch (e) {
         addConsoleLog(`خطأ اتصال: ${e.message}`, 'error');
         alert(`خطأ شبكة: ${e.message}`);
     }
@@ -555,14 +555,14 @@ async function clearSessionById() {
 function addActivityRow(user, activityText, status, latency) {
     const tableBody = document.getElementById('activity-table-body');
     if (!tableBody) return;
-    
+
     const row = document.createElement('tr');
-    
+
     const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
     const latencySec = (latency / 1000).toFixed(2);
-    
-    const statusBadge = status.toLowerCase() === 'online' ? 
-        '<span class="activity-badge online">ONLINE</span>' : 
+
+    const statusBadge = status.toLowerCase() === 'online' ?
+        '<span class="activity-badge online">ONLINE</span>' :
         '<span class="activity-badge offline">COMPLETED</span>';
 
     row.innerHTML = `
@@ -575,10 +575,10 @@ function addActivityRow(user, activityText, status, latency) {
         <td>${latencySec}s</td>
         <td>${statusBadge}</td>
     `;
-    
+
     // Prepend to top of table
     tableBody.insertBefore(row, tableBody.firstChild);
-    
+
     // Keep max 5 rows in activity stream
     if (tableBody.childNodes.length > 5) {
         tableBody.removeChild(tableBody.lastChild);
@@ -588,7 +588,7 @@ function addActivityRow(user, activityText, status, latency) {
 // -------------------- THEME TOGGLE LOGIC --------------------
 function toggleTheme() {
     const body = document.body;
-    
+
     if (body.classList.contains('light-theme')) {
         body.classList.remove('light-theme');
         localStorage.setItem('theme', 'dark');
@@ -605,7 +605,7 @@ function toggleTheme() {
 function loadSavedTheme() {
     const savedTheme = localStorage.getItem('theme');
     const body = document.body;
-    
+
     if (savedTheme === 'light') {
         body.classList.add('light-theme');
         setTimeout(() => updateChartTheme(true), 200);
@@ -614,14 +614,14 @@ function loadSavedTheme() {
 
 function updateChartTheme(isLight) {
     if (!latencyChart) return;
-    
+
     const textColor = isLight ? '#475569' : '#a3b1c6';
     const gridColor = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)';
-    
+
     latencyChart.options.scales.y.ticks.color = textColor;
     latencyChart.options.scales.y.grid.color = gridColor;
     latencyChart.options.scales.x.ticks.color = textColor;
-    
+
     latencyChart.update();
 }
 

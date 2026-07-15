@@ -55,7 +55,7 @@ export const useChatStore = create((set, get) => ({
 
       if (response.ok) {
         const data = await response.json();
-        
+
         // Map backend history (role: 'user' | 'assistant') to frontend (sender: 'user' | 'bot')
         const mappedMessages = data.history.map(m => {
           const time = new Date(m.timestamp * 1000).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
@@ -110,14 +110,14 @@ export const useChatStore = create((set, get) => ({
       messages: [
         ...state.messages,
         { sender: 'user', text: query, time: userTime },
-        { 
-          sender: 'bot', 
-          text: '', 
-          rawTextBuffer: '', 
-          rawTextTarget: '', 
+        {
+          sender: 'bot',
+          text: '',
+          rawTextBuffer: '',
+          rawTextTarget: '',
           isStreamClosed: false,
           citations: [],
-          time: botTime 
+          time: botTime
         }
       ],
       activePendingAction: null, // Clear any pending action since user wrote a new query
@@ -149,7 +149,7 @@ export const useChatStore = create((set, get) => ({
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         const errMsg = errData?.error?.message || errData?.detail || 'فشل الاتصال بالخادم الداخلي.';
-        
+
         set((state) => {
           const nextMessages = [...state.messages];
           nextMessages[botMessageIndex] = {
@@ -161,7 +161,7 @@ export const useChatStore = create((set, get) => ({
           };
           return { messages: nextMessages };
         });
-        
+
         appStore.addConsoleLog(`خطأ معالجة الطلب: ${errMsg}`, 'error');
         set({ isWaitingResponse: false });
         return;
@@ -299,11 +299,11 @@ export const useChatStore = create((set, get) => ({
         set((state) => {
           const nextMessages = [...state.messages];
           if (botMessageIndex >= 0 && nextMessages[botMessageIndex]) {
-            nextMessages[botMessageIndex].text = `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`;
-            nextMessages[botMessageIndex].rawTextTarget = `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`;
+            nextMessages[botMessageIndex].text = `⚠️ فشل إرسال الطلب: تأكد من الإتصال بالخادم. (${err.message})`;
+            nextMessages[botMessageIndex].rawTextTarget = `⚠️ فشل إرسال الطلب: تأكد من الإتصال بالخادم. (${err.message})`;
             nextMessages[botMessageIndex].isStreamClosed = true;
           } else {
-            nextMessages.push({ sender: 'bot', text: `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`, rawTextTarget: `⚠️ فشل إرسال الطلب: تأكد من تشغيل الخادم. (${err.message})`, isStreamClosed: true, time: botTime });
+            nextMessages.push({ sender: 'bot', text: `⚠️ فشل إرسال الطلب: تأكد من الإتصال بالخادم. (${err.message})`, rawTextTarget: `⚠️ فشل إرسال الطلب: تأكد من الإتصال بالخادم. (${err.message})`, isStreamClosed: true, time: botTime });
           }
           return { messages: nextMessages };
         });
@@ -353,7 +353,7 @@ export const useChatStore = create((set, get) => ({
       }
 
       const result = await response.json();
-      
+
       // Append bot success message
       const botTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
       set((state) => ({
@@ -363,7 +363,7 @@ export const useChatStore = create((set, get) => ({
       // Update metrics store to count successful SAP execution
       useMetricsStore.getState().updateMetrics(100, true, 'SAP');
       appStore.addConsoleLog(`تم تنفيذ الإجراء بنجاح في SAP SF.`, 'success');
-      
+
       // Refresh sidebar list
       get().fetchSessions();
 
@@ -408,15 +408,15 @@ export const useChatStore = create((set, get) => ({
       }
 
       const result = await response.json();
-      
+
       // Append bot confirmation message with action widget
       const botTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
       const actionPayload = result.action_payload || null;
-      
+
       set((state) => ({
-        messages: [...state.messages, { 
-          sender: 'bot', 
-          text: result.response, 
+        messages: [...state.messages, {
+          sender: 'bot',
+          text: result.response,
           time: botTime,
           actionWidget: actionPayload
         }],
@@ -424,7 +424,7 @@ export const useChatStore = create((set, get) => ({
       }));
 
       appStore.addConsoleLog(`تم تقديم نموذج الإجازة بنجاح — بانتظار التأكيد.`, 'success');
-      
+
     } catch (e) {
       appStore.addConsoleLog(`خطأ اتصال أثناء إرسال نموذج الإجازة: ${e.message}`, 'error');
       alert(`خطأ اتصال: ${e.message}`);
@@ -483,7 +483,7 @@ export const useChatStore = create((set, get) => ({
       const data = await response.json();
       if (response.ok && data.success) {
         appStore.addConsoleLog(`نجاح: تم مسح الجلسة ${targetSessionId} بالكامل وتفريغ ذاكرتها.`, 'success');
-        
+
         // Remove from local list
         set((state) => ({
           sessions: state.sessions.filter(s => s.session_id !== targetSessionId)

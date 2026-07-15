@@ -65,11 +65,11 @@ class SAPSuccessFactorsClient:
         mock_db = {
             "EMP101": SAPEmployeeProfile(
                 employee_id="EMP101",
-                first_name="Ahmed",
-                last_name="Al-Saeed",
-                department="Human Resources",
-                position="HR Specialist",
-                email="ahmed.alsaeed@hsagroup.com",
+                first_name="Sharaf",
+                last_name="",
+                department="AI",
+                position="AI",
+                email="sharaf@hsagroup.com",
                 status="Active"
             ),
             "EMP102": SAPEmployeeProfile(

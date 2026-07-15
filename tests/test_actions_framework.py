@@ -14,17 +14,17 @@ from services.orchestrator_service.domain.models import SessionState, Message
 def test_mock_sharepoint_auth():
     print("Running Test: Mock SharePoint Auth...")
     # Test valid login
-    user = authenticate_sharepoint("ahmed.alsaeed@hsagroup.com", "password123")
+    user = authenticate_sharepoint("sharaf@hsagroup.com", "password123")
     assert user is not None, "Failed authenticating valid email"
     assert user["employee_id"] == "EMP101", f"Expected EMP101, got {user['employee_id']}"
     
     # Test valid username lookup
-    user_by_username = authenticate_sharepoint("ahmed.alsaeed", "password123")
+    user_by_username = authenticate_sharepoint("sharaf", "password123")
     assert user_by_username is not None, "Failed authenticating valid username"
     assert user_by_username["employee_id"] == "EMP101"
     
     # Test invalid password
-    user_invalid = authenticate_sharepoint("ahmed.alsaeed", "wrong_password")
+    user_invalid = authenticate_sharepoint("sharaf", "wrong_password")
     assert user_invalid is None, "Logged in with wrong password!"
     print("✅ SharePoint Auth tests passed.")
 
