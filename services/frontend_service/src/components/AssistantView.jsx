@@ -292,13 +292,13 @@ function ThinkingIndicator({ text, color = 'gold', showIcon = true }) {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '0.4rem 0.8rem',
-    borderRadius: '12px',
-    background: 'rgba(255, 255, 255, 0.03)',
-    border: '1px solid rgba(255, 255, 255, 0.05)',
+    padding: '0.2rem 0',
+    borderRadius: '0',
+    background: 'transparent',
+    border: 'none',
     direction: isRtl ? 'rtl' : 'ltr',
     height: 'auto',
-    marginBottom: '0.5rem'
+    marginBottom: '0.2rem'
   };
 
   if (color === 'blue') {
@@ -306,15 +306,11 @@ function ThinkingIndicator({ text, color = 'gold', showIcon = true }) {
     textColor = '#38bdf8';
     iconClass = 'fa-solid fa-gears fa-spin';
     iconStyle = { color: '#38bdf8', fontSize: '0.85rem' };
-    indicatorStyle.background = 'rgba(56, 189, 248, 0.04)';
-    indicatorStyle.borderColor = 'rgba(56, 189, 248, 0.12)';
   } else if (color === 'gold') {
     dotBg = 'linear-gradient(135deg, var(--hsa-gold), var(--hsa-gold-dark))';
     textColor = 'var(--hsa-gold)';
     iconClass = 'fa-solid fa-wand-magic-sparkles fa-bounce';
     iconStyle = { color: 'var(--hsa-gold)', fontSize: '0.85rem' };
-    indicatorStyle.background = 'rgba(212, 175, 55, 0.04)';
-    indicatorStyle.borderColor = 'rgba(212, 175, 55, 0.12)';
   } else {
     dotBg = color;
     textColor = color;
@@ -703,7 +699,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
         // 2a. If citations exist, format and type the detailed thinking header
         const docSources = Array.from(new Set(state.citations.map(c => c.source)));
         // const expectedDetailedText = `جاري مراجعة وتحليل لوائح السياسات المسترجعة من مستند [${docSources.join(', ')}]...`;
-        const expectedDetailedText = `Analyzing`;
+        const expectedDetailedText = `جاري التحليل`;
 
         if (!hasInitializedThinkingText || targetThinkingText !== expectedDetailedText) {
           targetThinkingText = expectedDetailedText;
@@ -777,15 +773,15 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
 
       {/* 🧠 Thinking Block */}
       {inquiryShowText && (!isThinkingDone || (msg.citations && msg.citations.length > 0)) && (
-        <div className="thinking-process-container animate-fade-in" style={{ marginBottom: '0.6rem' }}>
+        <div className="thinking-process-container animate-fade-in" style={{ marginBottom: '0.2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', direction: isBubbleRtl ? 'rtl' : 'ltr', justifyContent: 'flex-start' }}>
             <button
               onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
               style={{
-                background: 'rgba(255, 255, 255, 0.05)',
+                background: 'transparent',
                 border: 'none',
-                width: '26px',
-                height: '26px',
+                width: '20px',
+                height: '20px',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -802,32 +798,26 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
               <i className={`fa-solid ${isThinkingExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`} style={{ fontSize: '0.75rem' }} />
             </button>
 
-            {/* <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-              ⚙️ جاري مراجعة وتحليل لوائح السياسات...
-            </span> */}
+            {/* Simulated typing status - moved next to expand button */}
+            {!isThinkingDone ? (
+              <ThinkingIndicator text={thinkingText} color="blue" />
+            ) : (
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <i className="fa-solid fa-circle-check" style={{ color: 'var(--success)', fontSize: '0.85rem' }} />
+                <span style={{ fontWeight: '600' }}>{thinkingText}</span>
+              </div>
+            )}
           </div>
 
           {isThinkingExpanded && (
-            <div className="thinking-process-content" style={{ marginTop: '0.4rem', padding: '0.6rem 0.8rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.12)', border: '1px solid rgba(255,255,255,0.03)' }}>
-              {/* Simulated typing status */}
-              <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', direction: isBubbleRtl ? 'rtl' : 'ltr' }}>
-                {!isThinkingDone ? (
-                  <ThinkingIndicator text={thinkingText} color="blue" />
-                ) : (
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', opacity: 0.7, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <i className="fa-solid fa-circle-check" style={{ color: 'var(--success)', fontSize: '0.85rem' }} />
-                    <span>{thinkingText}</span>
-                  </div>
-                )}
-              </div>
-
+            <div className="thinking-process-content" style={{ marginTop: '0.2rem', padding: '0 0.2rem' }}>
               {/* Citations references */}
               {msg.citations && msg.citations.length > 0 && msg.citations.map((cit, cIdx) => {
                 const typedText = typedCitations[cIdx] || '';
                 if (!typedText) return null; // Don't render if we haven't started typing this citation yet
                 return (
-                  <div key={cIdx} className="citation-block" style={{ padding: '0.5rem 0', borderBottom: cIdx < msg.citations.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                    <div className="citation-text" style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '0.25rem', direction: isBubbleRtl ? 'rtl' : 'ltr', textAlign: isBubbleRtl ? 'right' : 'left' }}>
+                  <div key={cIdx} className="citation-block" style={{ padding: '0.3rem 0' }}>
+                    <div className="citation-text" style={{ fontSize: '0.85rem', color: 'var(--hsa-gold)', opacity: 0.95, marginBottom: '0.25rem', direction: isBubbleRtl ? 'rtl' : 'ltr', textAlign: isBubbleRtl ? 'right' : 'left' }}>
                       "{typedText}"
                       {cIdx === typedCitations.length - 1 && !isThinkingDone && <span className="cursor-blink"></span>}
                     </div>
@@ -837,7 +827,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
                         target="_blank"
                         rel="noopener noreferrer"
                         className="citation-link"
-                        style={{ fontSize: '0.75rem', color: 'var(--hsa-gold)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                        style={{ fontSize: '0.75rem', color: 'var(--hsa-gold)', opacity: 0.8, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
                       >
                         <i className="fa-solid fa-file-pdf"></i>
                         <span>{cit.source} (صفحة {cit.page_number})</span>
@@ -929,7 +919,7 @@ function BotMessageBubble({ msg, index, activePendingAction, executePendingActio
 
       {/* 🔧 Action Buttons (Copy) */}
       {isTypingCompleted && (
-        <div className="message-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '0.4rem', justifyContent: 'flex-start', direction: 'rtl' }}>
+        <div className="message-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem', borderTop: 'none', paddingTop: '0.2rem', justifyContent: 'flex-start', direction: 'rtl' }}>
           <button
             onClick={handleCopy}
             className="action-icon-btn action-icon-btn-copy"
