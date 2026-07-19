@@ -10,6 +10,7 @@ export default function SharepointLogin({ onLoginSuccess }) {
 
   // Quick profiles for simulation
   const mockProfiles = [
+    { name: 'المدير العام', email: 'gm@hsagroup.com', role: 'مدير عام النظام (General Manager)', empId: 'EMP100' },
     { name: 'Sharaf', email: 'sharaf@hsagroup.com', role: 'الذكاء الاصطناعي (AI)', empId: 'EMP101' },
     { name: 'Testing User 2', email: 'khaled.mutahar@hsagroup.com', role: 'الذكاء الاصطناعي (AI Lead)', empId: 'EMP102' },
     { name: 'Testing User 3', email: 'sarah.jamil@hsagroup.com', role: 'المالية (Financial Analyst)', empId: 'EMP103' },
@@ -91,7 +92,7 @@ export default function SharepointLogin({ onLoginSuccess }) {
             <path d="M 5 32 Q 55 38 105 32" fill="none" stroke="#0056b3" strokeWidth="4" strokeLinecap="round" />
             <path d="M 45 32 Q 75 35 105 32" fill="none" stroke="url(#gold-grad)" strokeWidth="3" strokeLinecap="round" />
           </svg>
-          <div className="login-subtitle">بوابة تسجيل الدخول الموحد (SharePoint SSO Portal)</div>
+          <div className="login-subtitle">بوابة تسجيل الدخول (SharePoint SSO Portal)</div>
         </div>
 
         {errorMsg && (
@@ -145,7 +146,7 @@ export default function SharepointLogin({ onLoginSuccess }) {
             ) : (
               <>
                 <i className="fa-solid fa-right-to-bracket" style={{ marginLeft: '0.5rem' }}></i>
-                تسجيل الدخول الموحد
+                تسجيل الدخول
               </>
             )}
           </button>

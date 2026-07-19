@@ -5,6 +5,7 @@
 # & "P:\____AI____\HSAGroup\AskHRPro\run\run_all.ps1"
 # Stop all 
 # taskkill /F /IM python.exe
+# taskkill /F /IM powershell.exe
 
 
 # cloudeflare 

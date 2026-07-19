@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Dict, Any, List
 from core.security.sharepoint_mock import authenticate_sharepoint
 from core.security.auth import create_access_token, verify_jwt_or_bearer_token, UserPrincipal
+from core.security.permissions import get_effective_roles
 from core.logger import get_logger
 
 logger = get_logger("auth_api")
@@ -43,12 +44,15 @@ def login(request: LoginRequest):
             detail="اسم المستخدم أو كلمة المرور غير صحيحة."
         )
     
+    # Retrieve persistent/overridden roles
+    effective_roles = get_effective_roles(user["employee_id"], user["roles"])
+
     # Generate JWT Claims
     token_claims = {
         "sub": user["employee_id"],
         "employee_id": user["employee_id"],
         "tenant_id": user["tenant_id"],
-        "roles": user["roles"],
+        "roles": effective_roles,
         "scopes": ["read:profile", "write:leave", "read:payslip"]
     }
     
@@ -66,7 +70,7 @@ def login(request: LoginRequest):
             department=user["department"],
             position=user["position"],
             email=user["email"],
-            roles=user["roles"]
+            roles=effective_roles
         )
     )
 
@@ -82,13 +86,12 @@ def get_me(principal: UserPrincipal = Depends(verify_jwt_or_bearer_token)):
             detail="الرقم الوظيفي للموظف غير موجود في رمز الوصول."
         )
     user = get_user_by_employee_id(principal.employee_id)
-    
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="لم يتم العثور على ملف الموظف في النظام."
         )
-        
+    effective_roles = get_effective_roles(user["employee_id"], user["roles"])
     return UserProfileResponse(
         employee_id=user["employee_id"],
         username=user["username"],
@@ -97,5 +100,5 @@ def get_me(principal: UserPrincipal = Depends(verify_jwt_or_bearer_token)):
         department=user["department"],
         position=user["position"],
         email=user["email"],
-        roles=user["roles"]
+        roles=effective_roles
     )

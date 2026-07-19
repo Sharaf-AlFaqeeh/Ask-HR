@@ -4,12 +4,13 @@ import { useAppStore } from '../store/useAppStore';
 import { useChatStore } from '../store/useChatStore';
 import { useMetricsStore } from '../store/useMetricsStore';
 import { useAgentStore } from '../store/useAgentStore';
+import { hasPermission } from '../utils/permissions';
 
 export default function DashboardView() {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
 
-  const { theme, serverStatus } = useAppStore();
+  const { theme, serverStatus, loggedInUser } = useAppStore();
   const triggerIngest = useChatStore((state) => state.triggerIngest);
   const startNewSession = useChatStore((state) => state.startNewSession);
 
@@ -110,14 +111,18 @@ export default function DashboardView() {
           <span className="page-subtitle">أداء محرك أوركسترا الذكاء الاصطناعي ومعدلات طلبات الموظفين الفورية.</span>
         </div>
         <div className="page-actions">
-          <button className="btn-card" onClick={triggerIngest}>
-            <i className="fa-solid fa-arrows-rotate"></i>
-            <span>تحديث الفهرس</span>
-          </button>
-          <button className="btn-card" onClick={startNewSession}>
-            <i className="fa-solid fa-trash-can"></i>
-            <span>تصفير الجلسات</span>
-          </button>
+          {hasPermission(loggedInUser, 'update_index') && (
+            <button className="btn-card" onClick={triggerIngest}>
+              <i className="fa-solid fa-arrows-rotate"></i>
+              <span>تحديث الفهرس</span>
+            </button>
+          )}
+          {hasPermission(loggedInUser, 'delete_session') && (
+            <button className="btn-card" onClick={startNewSession}>
+              <i className="fa-solid fa-trash-can"></i>
+              <span>تصفير الجلسات</span>
+            </button>
+          )}
         </div>
       </div>
 

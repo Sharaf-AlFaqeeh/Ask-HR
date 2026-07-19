@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useChatStore } from '../store/useChatStore';
+import { hasPermission } from '../utils/permissions';
 
 export default function Header() {
   const { activeView, switchView, theme, toggleTheme, serverStatus, serverStatusText, checkServerHealth, loggedInUser, sidebarCollapsed, toggleSidebar } = useAppStore();
@@ -36,19 +37,16 @@ export default function Header() {
         </div>
       </div>
 
-      <div className="search-container">
-        <input type="text" className="search-input" placeholder="البحث عن مصادر وسياسات..." />
-        <i className="fa-solid fa-magnifying-glass search-icon"></i>
-      </div>
-
       <div className="header-tabs">
-        <div 
-          className={`header-tab ${activeView === 'dashboard' ? 'active' : ''}`} 
-          id="header-tab-overview" 
-          onClick={() => switchView('dashboard')}
-        >
-          نظرة عامة
-        </div>
+        {hasPermission(loggedInUser, 'view_overview') && (
+          <div 
+            className={`header-tab ${activeView === 'dashboard' ? 'active' : ''}`} 
+            id="header-tab-overview" 
+            onClick={() => switchView('dashboard')}
+          >
+            نظرة عامة
+          </div>
+        )}
         <div 
           className={`header-tab ${activeView === 'assistant' ? 'active' : ''}`} 
           id="header-tab-assistant" 
@@ -56,26 +54,30 @@ export default function Header() {
         >
           المساعد الذكي
         </div>
-        <div 
-          className={`header-tab ${activeView === 'settings' ? 'active' : ''}`} 
-          onClick={() => switchView('settings')}
-        >
-          الإعدادات والتفويض
-        </div>
+        {hasPermission(loggedInUser, 'view_settings') && (
+          <div 
+            className={`header-tab ${activeView === 'settings' ? 'active' : ''}`} 
+            onClick={() => switchView('settings')}
+          >
+            الإعدادات والتفويض
+          </div>
+        )}
       </div>
 
-      <button 
-        className="header-action-btn" 
-        onClick={triggerIngest}
-        disabled={isIngesting}
-      >
-        {isIngesting ? (
-          <i className="fa-solid fa-sync fa-spin" style={{ marginLeft: '0.25rem' }}></i>
-        ) : (
-          <span className="btn-icon-plus">+ </span>
-        )}
-        <span className="btn-text">تحديث الفهرس</span>
-      </button>
+      {hasPermission(loggedInUser, 'update_index') && (
+        <button 
+          className="header-action-btn" 
+          onClick={triggerIngest}
+          disabled={isIngesting}
+        >
+          {isIngesting ? (
+            <i className="fa-solid fa-sync fa-spin" style={{ marginLeft: '0.25rem' }}></i>
+          ) : (
+            <span className="btn-icon-plus">+ </span>
+          )}
+          <span className="btn-text">تحديث الفهرس</span>
+        </button>
+      )}
 
       <div className="header-controls">
         {/* Premium Theme Toggle Pill Switch */}

@@ -120,10 +120,12 @@ from fastapi.staticfiles import StaticFiles
 from services.orchestrator_service.api.v1.chat import router as chat_router
 from services.orchestrator_service.api.v1.admin import router as admin_router
 from services.orchestrator_service.api.v1.auth import router as auth_router
+from services.orchestrator_service.api.v1.permissions import router as permissions_router
 
 app.include_router(chat_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
+app.include_router(permissions_router, prefix="/api")
 
 # Mount HSA policies folder to serve PDF files
 hsa_policies_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../vector_db_service/HSA_policies"))
